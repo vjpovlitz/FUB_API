@@ -1,0 +1,33 @@
+# Environments / secrets
+.env
+.env.local
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# Logs / scratch
+*.log
+scratch/
+
+# Data exports (CSVs may contain PII)
+data/exports/
