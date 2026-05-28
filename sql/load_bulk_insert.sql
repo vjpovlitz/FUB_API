@@ -304,6 +304,199 @@ SELECT
 FROM stg.Events;
 GO
 
+-- ===== Tasks =====
+TRUNCATE TABLE stg.Tasks;
+GO
+BULK INSERT stg.Tasks
+FROM '$(DataDir)\Tasks.csv'
+WITH (
+    FORMAT = 'CSV',
+    FIRSTROW = 2,            -- skip header (also skips the BOM line)
+    FIELDTERMINATOR = ',',
+    ROWTERMINATOR = '0x0d0a',-- CRLF; if last col keeps a trailing CR, use '0x0a'
+    FIELDQUOTE = '"',
+    CODEPAGE = '65001',      -- UTF-8
+    TABLOCK
+);
+GO
+INSERT INTO fub.Tasks (
+    [TaskId],
+    [PersonId],
+    [Name],
+    [Type],
+    [IsCompleted],
+    [CompletedUtc],
+    [DueDate],
+    [DueDateTimeUtc],
+    [AssignedUserId],
+    [AssignedTo],
+    [CreatedById],
+    [CreatedBy],
+    [UpdatedById],
+    [UpdatedBy],
+    [RemindSecondsBefore],
+    [ExternalCalendarId],
+    [ExternalTaskLink],
+    [CreatedUtc],
+    [UpdatedUtc],
+    [RawJson],
+    [SourceSystem],
+    [SourceSystemId],
+    [ExtractedAtUtc]
+)
+SELECT
+    NULLIF([TaskId], '') AS [TaskId],
+    NULLIF([PersonId], '') AS [PersonId],
+    NULLIF([Name], '') AS [Name],
+    NULLIF([Type], '') AS [Type],
+    TRY_CONVERT(BIT, NULLIF([IsCompleted], '')) AS [IsCompleted],
+    TRY_CONVERT(DATETIME2(3), NULLIF([CompletedUtc], '')) AS [CompletedUtc],
+    TRY_CONVERT(DATE, NULLIF([DueDate], '')) AS [DueDate],
+    TRY_CONVERT(DATETIME2(3), NULLIF([DueDateTimeUtc], '')) AS [DueDateTimeUtc],
+    TRY_CONVERT(INT, NULLIF([AssignedUserId], '')) AS [AssignedUserId],
+    NULLIF([AssignedTo], '') AS [AssignedTo],
+    TRY_CONVERT(INT, NULLIF([CreatedById], '')) AS [CreatedById],
+    NULLIF([CreatedBy], '') AS [CreatedBy],
+    TRY_CONVERT(INT, NULLIF([UpdatedById], '')) AS [UpdatedById],
+    NULLIF([UpdatedBy], '') AS [UpdatedBy],
+    TRY_CONVERT(INT, NULLIF([RemindSecondsBefore], '')) AS [RemindSecondsBefore],
+    NULLIF([ExternalCalendarId], '') AS [ExternalCalendarId],
+    NULLIF([ExternalTaskLink], '') AS [ExternalTaskLink],
+    TRY_CONVERT(DATETIME2(3), NULLIF([CreatedUtc], '')) AS [CreatedUtc],
+    TRY_CONVERT(DATETIME2(3), NULLIF([UpdatedUtc], '')) AS [UpdatedUtc],
+    NULLIF([RawJson], '') AS [RawJson],
+    NULLIF([SourceSystem], '') AS [SourceSystem],
+    NULLIF([SourceSystemId], '') AS [SourceSystemId],
+    TRY_CONVERT(DATETIME2(3), NULLIF([ExtractedAtUtc], '')) AS [ExtractedAtUtc]
+FROM stg.Tasks;
+GO
+
+-- ===== Notes =====
+TRUNCATE TABLE stg.Notes;
+GO
+BULK INSERT stg.Notes
+FROM '$(DataDir)\Notes.csv'
+WITH (
+    FORMAT = 'CSV',
+    FIRSTROW = 2,            -- skip header (also skips the BOM line)
+    FIELDTERMINATOR = ',',
+    ROWTERMINATOR = '0x0d0a',-- CRLF; if last col keeps a trailing CR, use '0x0a'
+    FIELDQUOTE = '"',
+    CODEPAGE = '65001',      -- UTF-8
+    TABLOCK
+);
+GO
+INSERT INTO fub.Notes (
+    [NoteId],
+    [PersonId],
+    [Subject],
+    [Body],
+    [Type],
+    [IsHtml],
+    [IsExternal],
+    [SystemName],
+    [CreatedById],
+    [CreatedBy],
+    [UpdatedById],
+    [UpdatedBy],
+    [CreatedUtc],
+    [UpdatedUtc],
+    [RawJson],
+    [SourceSystem],
+    [SourceSystemId],
+    [ExtractedAtUtc]
+)
+SELECT
+    NULLIF([NoteId], '') AS [NoteId],
+    NULLIF([PersonId], '') AS [PersonId],
+    NULLIF([Subject], '') AS [Subject],
+    NULLIF([Body], '') AS [Body],
+    NULLIF([Type], '') AS [Type],
+    TRY_CONVERT(BIT, NULLIF([IsHtml], '')) AS [IsHtml],
+    TRY_CONVERT(BIT, NULLIF([IsExternal], '')) AS [IsExternal],
+    NULLIF([SystemName], '') AS [SystemName],
+    TRY_CONVERT(INT, NULLIF([CreatedById], '')) AS [CreatedById],
+    NULLIF([CreatedBy], '') AS [CreatedBy],
+    TRY_CONVERT(INT, NULLIF([UpdatedById], '')) AS [UpdatedById],
+    NULLIF([UpdatedBy], '') AS [UpdatedBy],
+    TRY_CONVERT(DATETIME2(3), NULLIF([CreatedUtc], '')) AS [CreatedUtc],
+    TRY_CONVERT(DATETIME2(3), NULLIF([UpdatedUtc], '')) AS [UpdatedUtc],
+    NULLIF([RawJson], '') AS [RawJson],
+    NULLIF([SourceSystem], '') AS [SourceSystem],
+    NULLIF([SourceSystemId], '') AS [SourceSystemId],
+    TRY_CONVERT(DATETIME2(3), NULLIF([ExtractedAtUtc], '')) AS [ExtractedAtUtc]
+FROM stg.Notes;
+GO
+
+-- ===== Calls =====
+TRUNCATE TABLE stg.Calls;
+GO
+BULK INSERT stg.Calls
+FROM '$(DataDir)\Calls.csv'
+WITH (
+    FORMAT = 'CSV',
+    FIRSTROW = 2,            -- skip header (also skips the BOM line)
+    FIELDTERMINATOR = ',',
+    ROWTERMINATOR = '0x0d0a',-- CRLF; if last col keeps a trailing CR, use '0x0a'
+    FIELDQUOTE = '"',
+    CODEPAGE = '65001',      -- UTF-8
+    TABLOCK
+);
+GO
+INSERT INTO fub.Calls (
+    [CallId],
+    [PersonId],
+    [UserId],
+    [UserName],
+    [IsIncoming],
+    [Duration],
+    [RingDuration],
+    [Outcome],
+    [Note],
+    [Phone],
+    [FromNumber],
+    [ToNumber],
+    [Name],
+    [FirstName],
+    [LastName],
+    [RecordingUrl],
+    [CreatedById],
+    [StartedAtUtc],
+    [CreatedUtc],
+    [UpdatedUtc],
+    [RawJson],
+    [SourceSystem],
+    [SourceSystemId],
+    [ExtractedAtUtc]
+)
+SELECT
+    NULLIF([CallId], '') AS [CallId],
+    NULLIF([PersonId], '') AS [PersonId],
+    TRY_CONVERT(INT, NULLIF([UserId], '')) AS [UserId],
+    NULLIF([UserName], '') AS [UserName],
+    TRY_CONVERT(BIT, NULLIF([IsIncoming], '')) AS [IsIncoming],
+    TRY_CONVERT(INT, NULLIF([Duration], '')) AS [Duration],
+    TRY_CONVERT(INT, NULLIF([RingDuration], '')) AS [RingDuration],
+    NULLIF([Outcome], '') AS [Outcome],
+    NULLIF([Note], '') AS [Note],
+    NULLIF([Phone], '') AS [Phone],
+    NULLIF([FromNumber], '') AS [FromNumber],
+    NULLIF([ToNumber], '') AS [ToNumber],
+    NULLIF([Name], '') AS [Name],
+    NULLIF([FirstName], '') AS [FirstName],
+    NULLIF([LastName], '') AS [LastName],
+    NULLIF([RecordingUrl], '') AS [RecordingUrl],
+    TRY_CONVERT(INT, NULLIF([CreatedById], '')) AS [CreatedById],
+    TRY_CONVERT(DATETIME2(3), NULLIF([StartedAtUtc], '')) AS [StartedAtUtc],
+    TRY_CONVERT(DATETIME2(3), NULLIF([CreatedUtc], '')) AS [CreatedUtc],
+    TRY_CONVERT(DATETIME2(3), NULLIF([UpdatedUtc], '')) AS [UpdatedUtc],
+    NULLIF([RawJson], '') AS [RawJson],
+    NULLIF([SourceSystem], '') AS [SourceSystem],
+    NULLIF([SourceSystemId], '') AS [SourceSystemId],
+    TRY_CONVERT(DATETIME2(3), NULLIF([ExtractedAtUtc], '')) AS [ExtractedAtUtc]
+FROM stg.Calls;
+GO
+
 -- ===== Users =====
 TRUNCATE TABLE stg.Users;
 GO
@@ -541,6 +734,9 @@ GO
 SELECT 'People' AS TableName, COUNT(*) AS Rows FROM fub.People;
 SELECT 'Deals' AS TableName, COUNT(*) AS Rows FROM fub.Deals;
 SELECT 'Events' AS TableName, COUNT(*) AS Rows FROM fub.Events;
+SELECT 'Tasks' AS TableName, COUNT(*) AS Rows FROM fub.Tasks;
+SELECT 'Notes' AS TableName, COUNT(*) AS Rows FROM fub.Notes;
+SELECT 'Calls' AS TableName, COUNT(*) AS Rows FROM fub.Calls;
 SELECT 'Users' AS TableName, COUNT(*) AS Rows FROM fub.Users;
 SELECT 'Pipelines' AS TableName, COUNT(*) AS Rows FROM fub.Pipelines;
 SELECT 'Stages' AS TableName, COUNT(*) AS Rows FROM fub.Stages;

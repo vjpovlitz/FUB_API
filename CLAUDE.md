@@ -158,10 +158,21 @@ FUB_API/
 │       ├── people.py                  ← DEFAULT_FIELDS=allFields, includeTrash=true
 │       ├── deals.py                   ← custom fields inline (allFields 400s)
 │       ├── events.py                  ← rate-limited 10/window
+│       ├── tasks.py                   ← activity fact (/tasks)
+│       ├── notes.py                   ← activity fact (/notes)
+│       ├── calls.py                   ← activity fact (/calls, ~57k; userId -1 = system)
 │       ├── users.py                   ← dim: team members
 │       ├── pipelines.py               ← dim: deal pipelines (nested stages[])
 │       └── stages.py                  ← dim: person stages only (see build_stages.py)
 │
+├── src/fub_mcp/                       ← READ-ONLY MCP server (fub-warehouse); see §14 + MCP_SERVER_GUIDE.md
+│   ├── config.py                      ← read-only conn (dcr_ro via MCP_SQL_*); ported from GHL
+│   ├── db.py                          ← validate_select + run_readonly + to_markdown (guardrails)
+│   ├── schema.py                      ← FUB glossary + describe_schema/describe_table (fub + analytics)
+│   ├── server.py                      ← FastMCP("fub-warehouse"); 14 tools; main()
+│   └── tools/                         ← @curated registry: analytics, people, deals, cross_system, tasks, activity
+│
+├── .mcp.json                          ← Claude Code registration for the fub-warehouse MCP server
 ├── scripts/
 │   ├── smoke_test.py                  ← raw httpx auth check (read-only)
 │   ├── export.py                      ← GENERIC single-endpoint extractor + audit (use this)
@@ -369,17 +380,19 @@ All People timestamps are clean **ISO 8601 UTC with `Z`** (`created`,
 | `/identity` | who the API key belongs to | used by smoke test |
 | `/people` | People (leads/contacts) | primary entity |
 | `/deals` | Deals (transactions/opportunities) | per-account |
-| `/events` | Events (activity log: emails, calls, web visits, etc.) | high volume |
-| `/notes` | Notes attached to people/deals | |
-| `/tasks` | Tasks assigned to users | |
+| `/events` | Events (activity log: emails, calls, web visits, etc.) | ✅ fact (3,211); high volume |
+| `/notes` | Notes attached to people | ✅ fact (9,238); FK Person/CreatedBy (CreatedBy -1=system) |
+| `/tasks` | Tasks assigned to users | ✅ fact (2,850); FK Person/Assigned/CreatedBy; set/checked/missed |
+| `/calls` | Phone calls | ✅ fact (57,231); FK Person/User (userId -1=system/automated) |
+| `/appointments` | Calendar appointments | 41 rows + /appointmentTypes(2),/appointmentOutcomes(3); NOT YET built |
 | `/users` | Team members | ✅ dim (4); 200 |
 | `/pipelines` | Pipeline definitions | ✅ dim (2); nested stages[] |
 | `/stages` | **Person** stages only | ✅ dim; deal stages come from /pipelines (§2) |
 | `/sources` | Lead sources | **404** — no such endpoint; Sources dim DERIVED |
 | `/leadSources` | Lead sources (alt path) | **403** — non-owner scope |
 | `/tags` | Tags | **403** — non-owner scope; Tags dim DERIVED |
-| `/textMessages` | SMS | not yet |
-| `/em` | Email events | not yet |
+| `/textMessages` | SMS | **400** w/o a filter — likely needs personId (per-person); not yet |
+| `/em` | Email events | **404** — not exposed |
 
 `/identity` + `/people?limit=1` are the two reads the smoke test depends on.
 
@@ -591,8 +604,9 @@ portable): `GHL_SQL_SERVER` (Tailnet IP,1433), `GHL_SQL_USER=sa`,
 includes `TrustServerCertificate=yes;Encrypt=no;`. `scripts/verify_sql_connection.py`
 TCP-probes + ODBC-connects and inventories both schemas.
 
-**Loaded (2026-05-27):** People 3,320 · Deals 228 · Events 3,209 · Users 4 ·
-Pipelines 2 · Stages 20 · Sources 27 · Tags 32 — all reconcile with the manifest.
+**Loaded (2026-05-28):** People 3,327 · Deals 228 · Events 3,211 · **Tasks 2,850 ·
+Notes 9,238 · Calls 57,231** · Users 4 · Pipelines 2 · Stages 20 · Sources 27 ·
+Tags 32 (11 tables) — all reconcile with the manifest.
 
 **Re-running:** `load_to_sql.py` defaults to running the DROP+CREATE DDL (clean
 reload). Use `--skip-ddl` to append/dedup into existing tables, `--truncate` to
@@ -679,3 +693,52 @@ launchctl start com.dcr.fub-refresh   # smoke-test one run now
 ```
 Logs: `logs/refresh-out.log` / `logs/refresh-err.log` (gitignored). `RunAtLoad`
 is false; missed fires coalesce into one catch-up on wake.
+
+---
+
+## 14. MCP server — read-only warehouse over stdio (DONE 2026-05-28)
+
+`src/fub_mcp/` is a FastMCP **stdio** server (`fub-warehouse`) that lets an LLM
+query the FUB warehouse through curated tools instead of hand-written SQL. Ported
+from GHL_API's `src/dcr_mcp/`; full design + build recipe in **`MCP_SERVER_GUIDE.md`**.
+
+**Safety (two layers):**
+1. Logs in as the **read-only `dcr_ro` SQL login** (reused from GHL — it has
+   `db_datareader` on the shared DB, which covers `fub` + `analytics`). Creds in
+   `.env` as `MCP_SQL_USER` / `MCP_SQL_PASSWORD` (copied from GHL_API's `.env`).
+   Verified: even bypassing validation, `dcr_ro` gets "UPDATE permission denied".
+2. `db.validate_select` rejects anything but a single `SELECT`/`WITH` (no writes,
+   DDL, `INTO`, procs, `WAITFOR`, multiple statements) → returns `Rejected: ...`.
+
+**14 tools:** `describe_schema` / `describe_table` (glossary + live columns over
+`fub` + `analytics`); 11 curated — `agent_leaderboard`, `daily_lead_funnel`,
+`deals_by_stage`, `lead_source_breakdown`, `people_search`, `event_activity`,
+`deal_detail`, `cross_system_contacts`, **`task_summary`** (set/completed/missed
+per agent), **`call_activity`**, **`note_activity`** (per-agent rollups over a
+date window); and a guarded `run_select` escape hatch. Curated tools bind params
+with `?` and whitelist ORDER BY columns via `check_choice`. Agent lookups go
+through `tools/base.resolve_users` (name or UserId); windows default to last 7
+days via `default_window` (until exclusive). Tool modules: `tools/{analytics,
+people,deals,cross_system,tasks,activity}.py`.
+
+**Run / register:**
+```bash
+pip install -e ".[mcp]"                 # mcp[cli]; pyodbc already core
+.venv/bin/python -m fub_mcp            # or the `fub-mcp` console script (stdio; blocks)
+.venv/bin/python -m mcp dev -m fub_mcp # Inspector UI to call tools by hand
+```
+Registered for Claude Code in **`.mcp.json`** (`fub-warehouse` → `python -m fub_mcp`);
+approve it when Claude Code prompts. For Cursor, add the same `command`/`args` to
+`~/.cursor/mcp.json`. The subprocess inherits no shell env, so `config.py` loads
+`.env` itself.
+
+**Tests:** `tests/test_mcp.py` (27 tests) covers `validate_select` (allows reads,
+rejects every write/DDL/multi-statement), `check_choice`/`check_date`, and the
+markdown formatter — **no DB required**. Full suite now **104 pass**.
+
+**Adding a tool:** write a `@curated` fn (type hints = input schema, docstring =
+model description) in `tools/<domain>.py`, ensure the module is imported in
+`tools/__init__.py`. `server.py` registers everything in `REGISTRY` automatically.
+
+**Backlog:** more tools as needed (tag/source ROI once owner-scoped key lands);
+optionally a unified `dcr-warehouse` server exposing `ghl` + `fub` + `analytics`.

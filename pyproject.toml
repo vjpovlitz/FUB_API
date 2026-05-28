@@ -29,9 +29,15 @@ dashboard = [
     "pandas>=2.2",
     "plotly>=5.22",
 ]
+mcp = [
+    "mcp[cli]>=1.0",
+]
+
+[project.scripts]
+fub-mcp = "fub_mcp.server:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/fub_api"]
+packages = ["src/fub_api", "src/fub_mcp"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

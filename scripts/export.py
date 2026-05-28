@@ -24,15 +24,21 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from fub_api.client import FUBClient  # noqa: E402
 from fub_api.mappers import (  # noqa: E402
+    CALL_COLUMNS,
     DEAL_COLUMNS,
     EVENT_COLUMNS,
+    NOTE_COLUMNS,
     PEOPLE_COLUMNS,
     PIPELINE_COLUMNS,
+    TASK_COLUMNS,
     USER_COLUMNS,
+    map_call,
     map_deal,
     map_event,
+    map_note,
     map_person,
     map_pipeline,
+    map_task,
     map_user,
 )
 
@@ -46,6 +52,9 @@ REGISTRY = {
     "people": ("people", PEOPLE_COLUMNS, map_person, "People.csv"),
     "deals": ("deals", DEAL_COLUMNS, map_deal, "Deals.csv"),
     "events": ("events", EVENT_COLUMNS, map_event, "Events.csv"),
+    "tasks": ("tasks", TASK_COLUMNS, map_task, "Tasks.csv"),
+    "notes": ("notes", NOTE_COLUMNS, map_note, "Notes.csv"),
+    "calls": ("calls", CALL_COLUMNS, map_call, "Calls.csv"),
     "users": ("users", USER_COLUMNS, map_user, "Users.csv"),
     "pipelines": ("pipelines", PIPELINE_COLUMNS, map_pipeline, "Pipelines.csv"),
 }

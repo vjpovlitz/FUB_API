@@ -570,3 +570,181 @@ def map_tag(rec: dict, *, extracted_at: str) -> dict[str, Any]:
         "SourceSystemId": name,
         "ExtractedAtUtc": extracted_at,
     }
+
+
+def _opt_id(v: Any) -> str:
+    """clean_id, but blank out 0 (FUB's 'no linked record' sentinel) so it
+    doesn't become a phantom foreign key. None already maps to ''."""
+    s = clean_id(v)
+    return "" if s == "0" else s
+
+
+# ---------------- Tasks (activity fact) ----------------
+# GET /tasks (2,850). FKs: PersonId -> People; AssignedUserId / CreatedById ->
+# Users (all resolve, ids 1-3). "set" = created (CreatedById), "checked" =
+# IsCompleted/CompletedUtc, "missed" = IsCompleted=0 and DueDate past.
+
+TASK_COLUMNS = [
+    "TaskId",
+    "PersonId",
+    "Name",
+    "Type",
+    "IsCompleted",
+    "CompletedUtc",
+    "DueDate",
+    "DueDateTimeUtc",
+    "AssignedUserId",
+    "AssignedTo",
+    "CreatedById",
+    "CreatedBy",
+    "UpdatedById",
+    "UpdatedBy",
+    "RemindSecondsBefore",
+    "ExternalCalendarId",
+    "ExternalTaskLink",
+    "CreatedUtc",
+    "UpdatedUtc",
+    "RawJson",
+    "SourceSystem",
+    "SourceSystemId",
+    "ExtractedAtUtc",
+]
+
+
+def map_task(t: dict, *, extracted_at: str) -> dict[str, Any]:
+    return {
+        "TaskId": clean_id(t.get("id")),
+        "PersonId": _opt_id(t.get("personId")),
+        "Name": clean_text(t.get("name"), max_len=512),
+        "Type": clean_text(t.get("type"), max_len=128),
+        "IsCompleted": clean_bit(t.get("isCompleted")),
+        "CompletedUtc": clean_utc_ts(t.get("completed")),
+        "DueDate": clean_date(t.get("dueDate")),
+        "DueDateTimeUtc": clean_utc_ts(t.get("dueDateTime")),
+        "AssignedUserId": clean_int(t.get("assignedUserId")),
+        "AssignedTo": clean_text(t.get("AssignedTo"), max_len=128),
+        "CreatedById": clean_int(t.get("createdById")),
+        "CreatedBy": clean_text(t.get("createdBy"), max_len=128),
+        "UpdatedById": clean_int(t.get("updatedById")),
+        "UpdatedBy": clean_text(t.get("updatedBy"), max_len=128),
+        "RemindSecondsBefore": clean_int(t.get("remindSecondsBefore")),
+        "ExternalCalendarId": clean_text(t.get("externalCalendarId"), max_len=128),
+        "ExternalTaskLink": clean_text(t.get("externalTaskLink"), max_len=1024),
+        "CreatedUtc": clean_utc_ts(t.get("created")),
+        "UpdatedUtc": clean_utc_ts(t.get("updated")),
+        "RawJson": clean_text(t),
+        "SourceSystem": SOURCE_SYSTEM,
+        "SourceSystemId": clean_id(t.get("id")),
+        "ExtractedAtUtc": extracted_at,
+    }
+
+
+# ---------------- Notes (activity fact) ----------------
+# GET /notes (9,238). FKs: PersonId -> People; CreatedById -> Users. Body is the
+# free-text note (can exceed 4000) -> NVARCHAR(MAX), full record also in RawJson.
+
+NOTE_COLUMNS = [
+    "NoteId",
+    "PersonId",
+    "Subject",
+    "Body",
+    "Type",
+    "IsHtml",
+    "IsExternal",
+    "SystemName",
+    "CreatedById",
+    "CreatedBy",
+    "UpdatedById",
+    "UpdatedBy",
+    "CreatedUtc",
+    "UpdatedUtc",
+    "RawJson",
+    "SourceSystem",
+    "SourceSystemId",
+    "ExtractedAtUtc",
+]
+
+
+def map_note(n: dict, *, extracted_at: str) -> dict[str, Any]:
+    return {
+        "NoteId": clean_id(n.get("id")),
+        "PersonId": _opt_id(n.get("personId")),
+        "Subject": clean_text(n.get("subject"), max_len=512),
+        "Body": clean_text(n.get("body")),  # NVARCHAR(MAX) — no truncation
+        "Type": clean_text(n.get("type"), max_len=64),
+        "IsHtml": clean_bit(n.get("isHtml")),
+        "IsExternal": clean_bit(n.get("isExternal")),
+        "SystemName": clean_text(n.get("systemName"), max_len=128),
+        "CreatedById": clean_int(n.get("createdById")),
+        "CreatedBy": clean_text(n.get("createdBy"), max_len=128),
+        "UpdatedById": clean_int(n.get("updatedById")),
+        "UpdatedBy": clean_text(n.get("updatedBy"), max_len=128),
+        "CreatedUtc": clean_utc_ts(n.get("created")),
+        "UpdatedUtc": clean_utc_ts(n.get("updated")),
+        "RawJson": clean_text(n),
+        "SourceSystem": SOURCE_SYSTEM,
+        "SourceSystemId": clean_id(n.get("id")),
+        "ExtractedAtUtc": extracted_at,
+    }
+
+
+# ---------------- Calls (activity fact) ----------------
+# GET /calls (57,227). FKs: PersonId -> People; UserId -> Users BUT userId can be
+# -1 (FUB system/automated call) which has no Users row — so UserId is captured
+# but NOT integrity-enforced. CreatedById likewise. Duration/RingDuration secs.
+
+CALL_COLUMNS = [
+    "CallId",
+    "PersonId",
+    "UserId",
+    "UserName",
+    "IsIncoming",
+    "Duration",
+    "RingDuration",
+    "Outcome",
+    "Note",
+    "Phone",
+    "FromNumber",
+    "ToNumber",
+    "Name",
+    "FirstName",
+    "LastName",
+    "RecordingUrl",
+    "CreatedById",
+    "StartedAtUtc",
+    "CreatedUtc",
+    "UpdatedUtc",
+    "RawJson",
+    "SourceSystem",
+    "SourceSystemId",
+    "ExtractedAtUtc",
+]
+
+
+def map_call(c: dict, *, extracted_at: str) -> dict[str, Any]:
+    return {
+        "CallId": clean_id(c.get("id")),
+        "PersonId": _opt_id(c.get("personId")),
+        "UserId": clean_int(c.get("userId")),  # may be -1 (system) — kept raw
+        "UserName": clean_text(c.get("userName"), max_len=128),
+        "IsIncoming": clean_bit(c.get("isIncoming")),
+        "Duration": clean_int(c.get("duration")),
+        "RingDuration": clean_int(c.get("ringDuration")),
+        "Outcome": clean_text(c.get("outcome"), max_len=128),
+        "Note": clean_text(c.get("note"), max_len=4000),
+        "Phone": clean_phone(c.get("phone")),
+        "FromNumber": clean_phone(c.get("fromNumber")),
+        "ToNumber": clean_phone(c.get("toNumber")),
+        "Name": clean_text(c.get("name"), max_len=256),
+        "FirstName": clean_text(c.get("firstName"), max_len=128),
+        "LastName": clean_text(c.get("lastName"), max_len=128),
+        "RecordingUrl": clean_text(c.get("recordingUrl"), max_len=1024),
+        "CreatedById": clean_int(c.get("createdById")),
+        "StartedAtUtc": clean_utc_ts(c.get("startedAt")),
+        "CreatedUtc": clean_utc_ts(c.get("created")),
+        "UpdatedUtc": clean_utc_ts(c.get("updated")),
+        "RawJson": clean_text(c),
+        "SourceSystem": SOURCE_SYSTEM,
+        "SourceSystemId": clean_id(c.get("id")),
+        "ExtractedAtUtc": extracted_at,
+    }

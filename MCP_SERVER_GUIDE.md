@@ -4,12 +4,12 @@ How to expose a DCR warehouse schema to an LLM as a **read-only MCP server**, so
 a model (Claude Desktop, Claude Code, Cursor, etc.) can answer questions about
 the data by calling curated tools instead of you hand-writing SQL.
 
-> **Status / direction (2026-05-28):** The reference implementation already
-> exists in the **sister project GHL_API** at `src/dcr_mcp/` (server name
-> `dcr-warehouse`, schema `ghl`). **FUB_API does not have an MCP server yet.**
-> This doc captures the GHL pattern verbatim and gives the step-by-step to build
-> the equivalent **`fub_mcp`** server here (schema `fub` + `analytics`). Either
-> project can use this as the canonical recipe.
+> **Status (2026-05-28): BUILT.** `fub_mcp` now exists at `src/fub_mcp/` (server
+> name `fub-warehouse`, schemas `fub` + `analytics`, 11 tools, registered in
+> `.mcp.json`). It was ported from the reference implementation in the sister
+> project **GHL_API** at `src/dcr_mcp/` (`dcr-warehouse`, schema `ghl`). This doc
+> remains the canonical recipe: §1–8 explain the pattern, §9–14 the build plan
+> and handoff. See CLAUDE.md §14 for the FUB-specific operational notes.
 
 ---
 

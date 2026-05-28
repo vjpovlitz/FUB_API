@@ -45,7 +45,7 @@ def test_no_orphan_when_all_resolve():
 @pytest.mark.parametrize("rule", RULES, ids=lambda r: f"{r.fact_col}->{r.dim_file}")
 def test_rules_reference_known_files(rule):
     known = {
-        "People.csv", "Deals.csv", "Events.csv",
+        "People.csv", "Deals.csv", "Events.csv", "Tasks.csv", "Notes.csv", "Calls.csv",
         "Users.csv", "Pipelines.csv", "Stages.csv", "Sources.csv", "Tags.csv",
     }
     assert rule.fact_file in known

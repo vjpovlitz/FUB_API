@@ -4,21 +4,27 @@ from __future__ import annotations
 import pytest
 
 from fub_api.mappers import (
+    CALL_COLUMNS,
     DEAL_COLUMNS,
     EVENT_COLUMNS,
+    NOTE_COLUMNS,
     PEOPLE_COLUMNS,
     PIPELINE_COLUMNS,
     SOURCE_COLUMNS,
     STAGE_COLUMNS,
     TAG_COLUMNS,
+    TASK_COLUMNS,
     USER_COLUMNS,
+    map_call,
     map_deal,
     map_event,
+    map_note,
     map_person,
     map_pipeline,
     map_source,
     map_stage,
     map_tag,
+    map_task,
     map_user,
 )
 from fub_api.schema import SCHEMAS, base_type, validate
@@ -30,7 +36,7 @@ def test_validate_passes():
 
 def test_every_schema_table_present():
     assert set(SCHEMAS) == {
-        "People", "Deals", "Events",
+        "People", "Deals", "Events", "Tasks", "Notes", "Calls",
         "Users", "Pipelines", "Stages", "Sources", "Tags",
     }
 
@@ -39,6 +45,9 @@ def test_every_schema_table_present():
     ("People", PEOPLE_COLUMNS),
     ("Deals", DEAL_COLUMNS),
     ("Events", EVENT_COLUMNS),
+    ("Tasks", TASK_COLUMNS),
+    ("Notes", NOTE_COLUMNS),
+    ("Calls", CALL_COLUMNS),
     ("Users", USER_COLUMNS),
     ("Pipelines", PIPELINE_COLUMNS),
     ("Stages", STAGE_COLUMNS),
@@ -56,6 +65,9 @@ def test_schema_columns_match_mapper(table, columns):
     (map_person, PEOPLE_COLUMNS),
     (map_deal, DEAL_COLUMNS),
     (map_event, EVENT_COLUMNS),
+    (map_task, TASK_COLUMNS),
+    (map_note, NOTE_COLUMNS),
+    (map_call, CALL_COLUMNS),
     (map_user, USER_COLUMNS),
     (map_pipeline, PIPELINE_COLUMNS),
     (map_stage, STAGE_COLUMNS),

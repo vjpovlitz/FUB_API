@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "fub-warehouse": {
+      "command": "/Users/smokestack/Projects/FUB_API/.venv/bin/python",
+      "args": ["-m", "fub_mcp"]
+    }
+  }
+}

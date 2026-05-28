@@ -140,6 +140,89 @@ CREATE TABLE stg.Events (
 );
 GO
 
+IF OBJECT_ID('stg.Tasks', 'U') IS NOT NULL DROP TABLE stg.Tasks;
+GO
+CREATE TABLE stg.Tasks (
+    [TaskId] NVARCHAR(MAX) NULL,
+    [PersonId] NVARCHAR(MAX) NULL,
+    [Name] NVARCHAR(MAX) NULL,
+    [Type] NVARCHAR(MAX) NULL,
+    [IsCompleted] NVARCHAR(MAX) NULL,
+    [CompletedUtc] NVARCHAR(MAX) NULL,
+    [DueDate] NVARCHAR(MAX) NULL,
+    [DueDateTimeUtc] NVARCHAR(MAX) NULL,
+    [AssignedUserId] NVARCHAR(MAX) NULL,
+    [AssignedTo] NVARCHAR(MAX) NULL,
+    [CreatedById] NVARCHAR(MAX) NULL,
+    [CreatedBy] NVARCHAR(MAX) NULL,
+    [UpdatedById] NVARCHAR(MAX) NULL,
+    [UpdatedBy] NVARCHAR(MAX) NULL,
+    [RemindSecondsBefore] NVARCHAR(MAX) NULL,
+    [ExternalCalendarId] NVARCHAR(MAX) NULL,
+    [ExternalTaskLink] NVARCHAR(MAX) NULL,
+    [CreatedUtc] NVARCHAR(MAX) NULL,
+    [UpdatedUtc] NVARCHAR(MAX) NULL,
+    [RawJson] NVARCHAR(MAX) NULL,
+    [SourceSystem] NVARCHAR(MAX) NULL,
+    [SourceSystemId] NVARCHAR(MAX) NULL,
+    [ExtractedAtUtc] NVARCHAR(MAX) NULL
+);
+GO
+
+IF OBJECT_ID('stg.Notes', 'U') IS NOT NULL DROP TABLE stg.Notes;
+GO
+CREATE TABLE stg.Notes (
+    [NoteId] NVARCHAR(MAX) NULL,
+    [PersonId] NVARCHAR(MAX) NULL,
+    [Subject] NVARCHAR(MAX) NULL,
+    [Body] NVARCHAR(MAX) NULL,
+    [Type] NVARCHAR(MAX) NULL,
+    [IsHtml] NVARCHAR(MAX) NULL,
+    [IsExternal] NVARCHAR(MAX) NULL,
+    [SystemName] NVARCHAR(MAX) NULL,
+    [CreatedById] NVARCHAR(MAX) NULL,
+    [CreatedBy] NVARCHAR(MAX) NULL,
+    [UpdatedById] NVARCHAR(MAX) NULL,
+    [UpdatedBy] NVARCHAR(MAX) NULL,
+    [CreatedUtc] NVARCHAR(MAX) NULL,
+    [UpdatedUtc] NVARCHAR(MAX) NULL,
+    [RawJson] NVARCHAR(MAX) NULL,
+    [SourceSystem] NVARCHAR(MAX) NULL,
+    [SourceSystemId] NVARCHAR(MAX) NULL,
+    [ExtractedAtUtc] NVARCHAR(MAX) NULL
+);
+GO
+
+IF OBJECT_ID('stg.Calls', 'U') IS NOT NULL DROP TABLE stg.Calls;
+GO
+CREATE TABLE stg.Calls (
+    [CallId] NVARCHAR(MAX) NULL,
+    [PersonId] NVARCHAR(MAX) NULL,
+    [UserId] NVARCHAR(MAX) NULL,
+    [UserName] NVARCHAR(MAX) NULL,
+    [IsIncoming] NVARCHAR(MAX) NULL,
+    [Duration] NVARCHAR(MAX) NULL,
+    [RingDuration] NVARCHAR(MAX) NULL,
+    [Outcome] NVARCHAR(MAX) NULL,
+    [Note] NVARCHAR(MAX) NULL,
+    [Phone] NVARCHAR(MAX) NULL,
+    [FromNumber] NVARCHAR(MAX) NULL,
+    [ToNumber] NVARCHAR(MAX) NULL,
+    [Name] NVARCHAR(MAX) NULL,
+    [FirstName] NVARCHAR(MAX) NULL,
+    [LastName] NVARCHAR(MAX) NULL,
+    [RecordingUrl] NVARCHAR(MAX) NULL,
+    [CreatedById] NVARCHAR(MAX) NULL,
+    [StartedAtUtc] NVARCHAR(MAX) NULL,
+    [CreatedUtc] NVARCHAR(MAX) NULL,
+    [UpdatedUtc] NVARCHAR(MAX) NULL,
+    [RawJson] NVARCHAR(MAX) NULL,
+    [SourceSystem] NVARCHAR(MAX) NULL,
+    [SourceSystemId] NVARCHAR(MAX) NULL,
+    [ExtractedAtUtc] NVARCHAR(MAX) NULL
+);
+GO
+
 IF OBJECT_ID('stg.Users', 'U') IS NOT NULL DROP TABLE stg.Users;
 GO
 CREATE TABLE stg.Users (

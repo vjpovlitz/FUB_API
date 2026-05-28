@@ -142,6 +142,92 @@ CREATE TABLE fub.Events (
 );
 GO
 
+IF OBJECT_ID('fub.Tasks', 'U') IS NOT NULL DROP TABLE fub.Tasks;
+GO
+CREATE TABLE fub.Tasks (
+    [TaskId] VARCHAR(64) NOT NULL,
+    [PersonId] VARCHAR(64) NULL,
+    [Name] NVARCHAR(512) NULL,
+    [Type] NVARCHAR(128) NULL,
+    [IsCompleted] BIT NULL,
+    [CompletedUtc] DATETIME2(3) NULL,
+    [DueDate] DATE NULL,
+    [DueDateTimeUtc] DATETIME2(3) NULL,
+    [AssignedUserId] INT NULL,
+    [AssignedTo] NVARCHAR(128) NULL,
+    [CreatedById] INT NULL,
+    [CreatedBy] NVARCHAR(128) NULL,
+    [UpdatedById] INT NULL,
+    [UpdatedBy] NVARCHAR(128) NULL,
+    [RemindSecondsBefore] INT NULL,
+    [ExternalCalendarId] NVARCHAR(128) NULL,
+    [ExternalTaskLink] NVARCHAR(1024) NULL,
+    [CreatedUtc] DATETIME2(3) NULL,
+    [UpdatedUtc] DATETIME2(3) NULL,
+    [RawJson] NVARCHAR(MAX) NULL,
+    [SourceSystem] VARCHAR(32) NULL,
+    [SourceSystemId] VARCHAR(64) NULL,
+    [ExtractedAtUtc] DATETIME2(3) NULL
+    , CONSTRAINT PK_fub_Tasks PRIMARY KEY ([TaskId])
+);
+GO
+
+IF OBJECT_ID('fub.Notes', 'U') IS NOT NULL DROP TABLE fub.Notes;
+GO
+CREATE TABLE fub.Notes (
+    [NoteId] VARCHAR(64) NOT NULL,
+    [PersonId] VARCHAR(64) NULL,
+    [Subject] NVARCHAR(512) NULL,
+    [Body] NVARCHAR(MAX) NULL,
+    [Type] NVARCHAR(64) NULL,
+    [IsHtml] BIT NULL,
+    [IsExternal] BIT NULL,
+    [SystemName] NVARCHAR(128) NULL,
+    [CreatedById] INT NULL,
+    [CreatedBy] NVARCHAR(128) NULL,
+    [UpdatedById] INT NULL,
+    [UpdatedBy] NVARCHAR(128) NULL,
+    [CreatedUtc] DATETIME2(3) NULL,
+    [UpdatedUtc] DATETIME2(3) NULL,
+    [RawJson] NVARCHAR(MAX) NULL,
+    [SourceSystem] VARCHAR(32) NULL,
+    [SourceSystemId] VARCHAR(64) NULL,
+    [ExtractedAtUtc] DATETIME2(3) NULL
+    , CONSTRAINT PK_fub_Notes PRIMARY KEY ([NoteId])
+);
+GO
+
+IF OBJECT_ID('fub.Calls', 'U') IS NOT NULL DROP TABLE fub.Calls;
+GO
+CREATE TABLE fub.Calls (
+    [CallId] VARCHAR(64) NOT NULL,
+    [PersonId] VARCHAR(64) NULL,
+    [UserId] INT NULL,
+    [UserName] NVARCHAR(128) NULL,
+    [IsIncoming] BIT NULL,
+    [Duration] INT NULL,
+    [RingDuration] INT NULL,
+    [Outcome] NVARCHAR(128) NULL,
+    [Note] NVARCHAR(4000) NULL,
+    [Phone] VARCHAR(32) NULL,
+    [FromNumber] VARCHAR(32) NULL,
+    [ToNumber] VARCHAR(32) NULL,
+    [Name] NVARCHAR(256) NULL,
+    [FirstName] NVARCHAR(128) NULL,
+    [LastName] NVARCHAR(128) NULL,
+    [RecordingUrl] NVARCHAR(1024) NULL,
+    [CreatedById] INT NULL,
+    [StartedAtUtc] DATETIME2(3) NULL,
+    [CreatedUtc] DATETIME2(3) NULL,
+    [UpdatedUtc] DATETIME2(3) NULL,
+    [RawJson] NVARCHAR(MAX) NULL,
+    [SourceSystem] VARCHAR(32) NULL,
+    [SourceSystemId] VARCHAR(64) NULL,
+    [ExtractedAtUtc] DATETIME2(3) NULL
+    , CONSTRAINT PK_fub_Calls PRIMARY KEY ([CallId])
+);
+GO
+
 IF OBJECT_ID('fub.Users', 'U') IS NOT NULL DROP TABLE fub.Users;
 GO
 CREATE TABLE fub.Users (

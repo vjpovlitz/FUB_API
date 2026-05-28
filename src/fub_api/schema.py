@@ -19,14 +19,17 @@ backend can cast them — see mappers._map_custom_fields.
 from __future__ import annotations
 
 from fub_api.mappers import (
+    CALL_COLUMNS,
     CUSTOM_FIELD_TYPES,
     DEAL_COLUMNS,
     EVENT_COLUMNS,
+    NOTE_COLUMNS,
     PEOPLE_COLUMNS,
     PIPELINE_COLUMNS,
     SOURCE_COLUMNS,
     STAGE_COLUMNS,
     TAG_COLUMNS,
+    TASK_COLUMNS,
     USER_COLUMNS,
     _custom_column,
 )
@@ -210,11 +213,80 @@ TAG_TYPES: dict[str, str] = {
 }
 
 
+TASK_TYPES: dict[str, str] = {
+    "TaskId": "VARCHAR(64)",
+    "PersonId": "VARCHAR(64)",
+    "Name": "NVARCHAR(512)",
+    "Type": "NVARCHAR(128)",
+    "IsCompleted": "BIT",
+    "CompletedUtc": "DATETIME2(3)",
+    "DueDate": "DATE",
+    "DueDateTimeUtc": "DATETIME2(3)",
+    "AssignedUserId": "INT",
+    "AssignedTo": "NVARCHAR(128)",
+    "CreatedById": "INT",
+    "CreatedBy": "NVARCHAR(128)",
+    "UpdatedById": "INT",
+    "UpdatedBy": "NVARCHAR(128)",
+    "RemindSecondsBefore": "INT",
+    "ExternalCalendarId": "NVARCHAR(128)",
+    "ExternalTaskLink": "NVARCHAR(1024)",
+    "CreatedUtc": "DATETIME2(3)",
+    "UpdatedUtc": "DATETIME2(3)",
+    **_AUDIT_TYPES,
+}
+
+NOTE_TYPES: dict[str, str] = {
+    "NoteId": "VARCHAR(64)",
+    "PersonId": "VARCHAR(64)",
+    "Subject": "NVARCHAR(512)",
+    "Body": "NVARCHAR(MAX)",
+    "Type": "NVARCHAR(64)",
+    "IsHtml": "BIT",
+    "IsExternal": "BIT",
+    "SystemName": "NVARCHAR(128)",
+    "CreatedById": "INT",
+    "CreatedBy": "NVARCHAR(128)",
+    "UpdatedById": "INT",
+    "UpdatedBy": "NVARCHAR(128)",
+    "CreatedUtc": "DATETIME2(3)",
+    "UpdatedUtc": "DATETIME2(3)",
+    **_AUDIT_TYPES,
+}
+
+CALL_TYPES: dict[str, str] = {
+    "CallId": "VARCHAR(64)",
+    "PersonId": "VARCHAR(64)",
+    "UserId": "INT",
+    "UserName": "NVARCHAR(128)",
+    "IsIncoming": "BIT",
+    "Duration": "INT",
+    "RingDuration": "INT",
+    "Outcome": "NVARCHAR(128)",
+    "Note": "NVARCHAR(4000)",
+    "Phone": "VARCHAR(32)",
+    "FromNumber": "VARCHAR(32)",
+    "ToNumber": "VARCHAR(32)",
+    "Name": "NVARCHAR(256)",
+    "FirstName": "NVARCHAR(128)",
+    "LastName": "NVARCHAR(128)",
+    "RecordingUrl": "NVARCHAR(1024)",
+    "CreatedById": "INT",
+    "StartedAtUtc": "DATETIME2(3)",
+    "CreatedUtc": "DATETIME2(3)",
+    "UpdatedUtc": "DATETIME2(3)",
+    **_AUDIT_TYPES,
+}
+
+
 # entity table name -> (ordered columns, type map, primary key column)
 SCHEMAS: dict[str, tuple[list[str], dict[str, str], str]] = {
     "People": (PEOPLE_COLUMNS, PEOPLE_TYPES, "PersonId"),
     "Deals": (DEAL_COLUMNS, DEAL_TYPES, "DealId"),
     "Events": (EVENT_COLUMNS, EVENT_TYPES, "EventId"),
+    "Tasks": (TASK_COLUMNS, TASK_TYPES, "TaskId"),
+    "Notes": (NOTE_COLUMNS, NOTE_TYPES, "NoteId"),
+    "Calls": (CALL_COLUMNS, CALL_TYPES, "CallId"),
     "Users": (USER_COLUMNS, USER_TYPES, "UserId"),
     "Pipelines": (PIPELINE_COLUMNS, PIPELINE_TYPES, "PipelineId"),
     "Stages": (STAGE_COLUMNS, STAGE_TYPES, "StageId"),

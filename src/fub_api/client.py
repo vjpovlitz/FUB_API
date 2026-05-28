@@ -18,11 +18,14 @@ from dotenv import load_dotenv
 
 from fub_api.auth import BasicAuthCredentials
 from fub_api.exceptions import FUBAPIError, FUBAuthError, FUBRateLimitError
+from fub_api.resources.calls import Calls
 from fub_api.resources.deals import Deals
 from fub_api.resources.events import Events
+from fub_api.resources.notes import Notes
 from fub_api.resources.people import People
 from fub_api.resources.pipelines import Pipelines
 from fub_api.resources.stages import Stages
+from fub_api.resources.tasks import Tasks
 from fub_api.resources.users import Users
 from fub_api.throttle import Throttle
 
@@ -49,6 +52,9 @@ class FUBClient:
         self.people = People(self)
         self.deals = Deals(self)
         self.events = Events(self)
+        self.tasks = Tasks(self)
+        self.notes = Notes(self)
+        self.calls = Calls(self)
         self.users = Users(self)
         self.pipelines = Pipelines(self)
         self.stages = Stages(self)

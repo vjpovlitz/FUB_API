@@ -44,6 +44,14 @@ RULES = [
     Rule("Deals.csv", "PrimaryUserId", "Users.csv", "UserId"),
     Rule("Deals.csv", "UserIds", "Users.csv", "UserId", multi=True),
     Rule("Events.csv", "PersonId", "People.csv", "PersonId"),
+    # Activity facts. CreatedById / Calls.UserId are NOT enforced: FUB uses -1 for
+    # the system/automation actor (auto-created tasks/notes, automated calls),
+    # which has no Users row — same class as the omitted lender/pond FKs above.
+    # AssignedUserId (a real human assignment) does resolve, so it is enforced.
+    Rule("Tasks.csv", "PersonId", "People.csv", "PersonId"),
+    Rule("Tasks.csv", "AssignedUserId", "Users.csv", "UserId"),
+    Rule("Notes.csv", "PersonId", "People.csv", "PersonId"),
+    Rule("Calls.csv", "PersonId", "People.csv", "PersonId"),
 ]
 
 
