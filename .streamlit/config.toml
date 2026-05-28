@@ -1,0 +1,11 @@
+# Dana Capital Realty brand theme (palette from danacapitalrealty.com).
+[theme]
+base = "light"
+primaryColor = "#005dcf"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f3f5f8"
+textColor = "#1d1d1d"
+font = "sans serif"
+
+[server]
+headless = true

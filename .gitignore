@@ -28,6 +28,12 @@ htmlcov/
 # Logs / scratch
 *.log
 scratch/
+logs/
 
 # Data exports (CSVs may contain PII)
 data/exports/
+
+# Local-only planning docs (scratch specs / infra details — keep off the public repo)
+nextsteps.md
+FUB_API_bootstrap_nextsteps.md
+task.md

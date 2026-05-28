@@ -61,7 +61,8 @@ What's done:
 | `scripts/generate_ddl.py` → `sql/create_tables.sql` / `staging_tables.sql` / `load_bulk_insert.sql` | ✅ |
 | `src/fub_api/manifest.py` + `scripts/manifest.py` → `data/exports/manifest.json` | ✅ |
 | **Dimension tables — Users (4), Pipelines (2), Stages (20), Sources (27), Tags (32)** | ✅ |
-| Tests: 58 pass (23 sanitize + 19 schema/mapper sync + 16 integrity) | ✅ |
+| Tests: 67 pass (23 sanitize + 19 schema/mapper + 16 integrity + 9 load) | ✅ |
+| **Loaded into SQL Server** — `fub.*` (8 tables) live in shared `dcr_warehouse` | ✅ |
 
 ### Dimension tables (added 2026-05-27)
 
@@ -167,17 +168,31 @@ FUB_API/
 │   ├── build_stages.py                ← unified Stages = /stages ∪ /pipelines[].stages[]
 │   ├── derive_dims.py                 ← Sources + Tags derived from People.csv (no live ep)
 │   ├── check_integrity.py             ← FK gate: every fact FK resolves in its dim; exit=1
+│   ├── run_all.py                     ← extract ALL + audit + integrity + manifest (one exit)
+│   ├── verify_sql_connection.py       ← TCP+ODBC check; inventories fub.* AND ghl.*
+│   ├── load_to_sql.py                 ← pyodbc loader → fub.* in shared dcr_warehouse
+│   ├── refresh_daily.py               ← scheduled orchestrator: run_all → load_to_sql → smoke
 │   ├── export_people_poc.py           ← older People-only POC (superseded by export.py)
 │   ├── audit_csv.py                   ← SQL-Server-safety audit; exit=1 on issue
 │   ├── generate_ddl.py                ← writes the three sql/ files from schema.py
 │   └── manifest.py                    ← writes data/exports/manifest.json
 │
-├── sql/                               ← generated; do not hand-edit
+├── launchd/com.dcr.fub-refresh.plist  ← 4x/day refresh job (install to ~/Library/LaunchAgents)
+├── sql/                               ← create_tables/staging/load are generated; views are hand-written
 │   ├── create_tables.sql              ← typed fub.* (3 facts + 5 dims)
 │   ├── staging_tables.sql             ← stg.* all NVARCHAR(MAX)
-│   └── load_bulk_insert.sql           ← BULK INSERT + TRY_CONVERT cast + reconcile
+│   ├── load_bulk_insert.sql           ← BULK INSERT + TRY_CONVERT cast + reconcile
+│   ├── views/                         ← fub.vw_* KPI views (auto-applied by load_to_sql)
+│   └── analytics/                     ← analytics.vw_AllContacts (cross-system; applied separately)
 │
-├── tests/                             ← 58 pass: test_sanitize/test_schema/test_integrity
+├── .streamlit/config.toml             ← DCR brand theme (blue #005dcf, navy, light bg)
+├── dashboard/                         ← separate Streamlit app (port 8502)
+│   ├── _db.py                         ← pyodbc conn + cached q(); GHL_SQL_* vars
+│   ├── _brand.py                      ← DCR brand: CSS, header(), style_fig(), render_sidebar()+login dialog
+│   ├── assets/logo.png                ← white DCR wordmark (from danacapitalrealty.com)
+│   ├── app.py                         ← ROUTER: st.navigation (Analytics/Workspace) + st.logo + sidebar
+│   └── pages/                         ← 0_Overview, 1_Funnel, 2_Agents, 3_Deals, 4_CrossSystem, 8_Account, 9_Settings
+├── tests/                             ← 67 pass: sanitize/schema/integrity/load
 └── data/exports/                      ← OUTPUT, gitignored — CSVs + manifest land here
 ```
 
@@ -210,6 +225,12 @@ pip install -e ".[dev]"
 # all extracts). Exit 1 on any orphan. 11 rules, currently 0 orphans.
 .venv/bin/python scripts/check_integrity.py
 
+# --- SQL Server load (shared dcr_warehouse, fub schema) ---
+# Needs GHL_SQL_* in .env (same target as GHL_API) + ODBC Driver 18 + pyodbc.
+.venv/bin/python scripts/verify_sql_connection.py     # connection + schema inventory
+.venv/bin/python scripts/load_to_sql.py --only Users  # POC: DDL + one table
+.venv/bin/python scripts/load_to_sql.py               # DDL (recreate fub.*) + load all 8
+
 # Re-audit existing CSVs without re-pulling
 .venv/bin/python scripts/audit_csv.py
 
@@ -219,7 +240,7 @@ pip install -e ".[dev]"
 # Refresh the manifest (row counts + sha256)
 .venv/bin/python scripts/manifest.py
 
-# Tests (58 pass)
+# Tests (67 pass)
 .venv/bin/python -m pytest tests/ -q
 ```
 
@@ -431,7 +452,9 @@ If you forget them, FUB still responds but your integration shows up as
 - ✅ **Dimensions** — Users (4), Pipelines (2), Stages (20, unified), Sources
   (27, derived), Tags (32, derived). All audited 0 issues; every fact FK
   resolves 100%. See §2 "Dimension tables".
-- ✅ **manifest.json** + 58 passing tests.
+- ✅ **manifest.json** + 67 passing tests.
+- ✅ **Loaded into SQL Server** (2026-05-27) — `fub.*` (all 8 tables) live in the
+  shared `dcr_warehouse` alongside `ghl.*`, via the pyodbc loader. See §12.
 
 CSVs currently on disk in `data/exports/` (gitignored): People.csv, Deals.csv,
 Events.csv, Users.csv, Pipelines.csv, Stages.csv, Sources.csv, Tags.csv,
@@ -536,3 +559,123 @@ The cross-project memory from GHL_API also applies:
   values — burst limits vary by FUB plan.
 - **Don't** use `git rebase -i`, `--amend`, or force-push without explicit
   user permission. Create new commits.
+- **Don't** CREATE or DROP the `dcr_warehouse` database — it's shared with
+  GHL_API and already exists. The loader connects straight to it; only the
+  `fub` schema + `fub.*` tables are created/dropped.
+- **Don't** touch `ghl.*` — it's the sister project's data in the same DB.
+- **Don't** omit `TrustServerCertificate=yes;Encrypt=no;` from any pyodbc/sqlcmd
+  connection string (self-signed cert + Driver 18 defaults to Encrypt=yes).
+- **Don't** hardcode the Tailnet IP or sa password anywhere tracked — the repo
+  is public; connection values live only in `.env` (gitignored).
+
+---
+
+## 12. SQL Server load path (DONE 2026-05-27)
+
+FUB data is loaded into the **same `dcr_warehouse`** as GHL_API, under a
+separate **`fub` schema** (coexists with `ghl.*`). Driven by `nextsteps.md`.
+
+**Two load paths exist** (same typed `fub.*` target, pick one):
+1. **pyodbc loader — `scripts/load_to_sql.py`** (the one we use; cross-network).
+   executemany(fast_executemany) over Tailscale; the CSV does NOT need to live
+   on the server. Column order/types/PKs come from `schema.py`; conversions via
+   `_convert` (empty→NULL, bad value→NULL, datetime strips `Z`/`T`, BIT 1/0).
+   NVARCHAR(MAX) cols (RawJson) handled via `setinputsizes`. Reconciles row
+   counts against `manifest.json` at the end. Idempotent: dedups by PK on rerun.
+2. **sqlcmd BULK path — `sql/load_bulk_insert.sql`** (file must be local to the
+   server). Lands in `stg.*` (all NVARCHAR) then TRY_CONVERTs into `fub.*`.
+
+**Connection:** all GHL_SQL_* env vars (names shared with GHL_API so code is
+portable): `GHL_SQL_SERVER` (Tailnet IP,1433), `GHL_SQL_USER=sa`,
+`GHL_SQL_PASSWORD`, `GHL_SQL_DATABASE=dcr_warehouse`. Every connection string
+includes `TrustServerCertificate=yes;Encrypt=no;`. `scripts/verify_sql_connection.py`
+TCP-probes + ODBC-connects and inventories both schemas.
+
+**Loaded (2026-05-27):** People 3,320 · Deals 228 · Events 3,209 · Users 4 ·
+Pipelines 2 · Stages 20 · Sources 27 · Tags 32 — all reconcile with the manifest.
+
+**Re-running:** `load_to_sql.py` defaults to running the DROP+CREATE DDL (clean
+reload). Use `--skip-ddl` to append/dedup into existing tables, `--truncate` to
+clear+reload without recreating. The DDL only ever touches `fub.*`.
+
+**Analytics views (DONE 2026-05-27):**
+- `sql/views/*.sql` → `fub.vw_DailyLeadFunnel`, `fub.vw_AgentLeaderboard`,
+  `fub.vw_DealsByStage`. Applied automatically by `load_to_sql.py` (it runs
+  `sql/views/*.sql` after load, unless `--skip-views`). FUB has no won/lost deal
+  status — "closed" = the deal's StageId maps to a `fub.Stages` row with
+  `ClosedStage=1`. Smoke-checked: deals reconcile to 228, agent leads to 3,320.
+- `sql/analytics/vw_AllContacts.sql` → `analytics.vw_AllContacts`: UNION ALL of
+  `ghl.Contacts` + `fub.People`, normalized + a `SourceSystem` column
+  (255,605 rows = 252,285 GHL + 3,320 FUB). This is the cross-system view; it
+  depends on BOTH schemas so it is **applied separately** (not by the fub
+  loader's views step, which is fub-only). Apply via run_sql_file or sqlcmd.
+
+**Dashboard (DONE 2026-05-27):** separate Streamlit app in `dashboard/` (NOT the
+GHL app — respects "don't touch GHL_API prod"). `app.py` is a **router** using
+`st.navigation` — pages live in `pages/` but are registered/ordered/grouped in
+`app.py` (NOT the legacy auto-`pages/` nav). Two nav sections: **Analytics**
+(Overview, Lead Funnel, Agents, Deals, Cross-System) + **Workspace** (Account,
+Settings — placeholders). Reads `fub.*` / `fub.vw_*` / `analytics.*` via
+`dashboard/_db.py` (same GHL_SQL_* conn pattern). Run:
+`.venv/bin/streamlit run dashboard/app.py --server.port 8502`. Deps in the
+`dashboard` extra (`pip install -e ".[dashboard]"`: streamlit/pandas/plotly).
+Validated with `streamlit.testing.v1.AppTest` (all 8 scripts + every nav
+switch + login toggle run clean against the live DB); not yet eyeballed in a
+browser.
+
+Navigation contract (don't break): `st.set_page_config` + `apply_brand()` are
+called **once** in `app.py` (the entry script), so page files must NOT call
+either (a second `set_page_config` raises). Page files keep their own
+`sys.path.insert(parent.parent)` only so they stay runnable standalone under
+AppTest. Add a new page = add a `st.Page(...)` to `PAGES` in `app.py`.
+
+**Branding (DCR):** themed to danacapitalrealty.com — brand blue `#005dcf` on
+navy, Saira (display) + Montserrat (body), white DCR logo. `.streamlit/config.toml`
+sets the base theme; `dashboard/_brand.py` injects fonts + CSS (metric cards,
+hides default Streamlit chrome) and provides `apply_brand()` / `header()` /
+`style_fig()` / `render_sidebar()`. Each page calls `header()` + wraps plotly figs
+in `style_fig()`. Re-pull the logo from the site's Carrot CDN if it changes
+(`dashboard/assets/logo.png`, white-on-transparent).
+
+**Sidebar — liquid glass (DONE 2026-05-28):** dark navy frosted sidebar
+(`backdrop-filter: blur`), white logo pinned on top via `st.logo()`, nav links
+styled as glass pills (active = brand-blue glow), grouped section labels. Bottom
+of the sidebar is a **glass user/login card** rendered by
+`_brand.render_sidebar()` (called once in `app.py` after `st.navigation`): shows
+a Guest card + **Sign in** button when logged out, or an avatar + name + **Sign
+out** when "logged in". Sign in opens an `@st.dialog` modal (email/password) —
+**placeholder auth: nothing is validated or stored**, it just sets
+`st.session_state["dcr_user"]` so the UI flips. `pages/8_Account.py` +
+`9_Settings.py` are placeholder screens (profile / workspace / connections;
+appearance / data / notifications) clearly labeled not-yet-wired.
+
+**Next (warehouse side):** incremental/delta sync + MERGE-upsert loader, then
+more cross-system `analytics.vw_*` (a lead funnel joining both CRMs).
+
+---
+
+## 13. Scheduled refresh (launchd)
+
+`scripts/refresh_daily.py` is the unattended orchestrator: `run_all.py` (extract
+→ audit → integrity → manifest) → `load_to_sql.py` (full reload + fub.vw_*) →
+re-apply `analytics.vw_AllContacts` → smoke-check every view returns rows. One
+exit code; any step failing raises `RefreshError` and fires `fub_api.alerts`
+(`ALERT_WEBHOOK_URL` / `ALERT_MACOS` in `.env`, best-effort). Flags:
+`--dry-run`, `--skip-extract` (reload from existing CSVs, ~4s).
+
+**It's a FULL refresh** (re-extract + DROP+CREATE reload) — fine for this tiny
+dataset, captures updates AND inserts. The slow part is the API re-extract
+(~12 min: /events is 10/window). The zero-downtime upgrade is an `updatedAfter`
+incremental extract + MERGE-upsert loader (backlog).
+
+**launchd:** `launchd/com.dcr.fub-refresh.plist` runs it at 9:30/13:30/16:30/
+21:30 local — offset 30 min from GHL's `:00` job so they don't hit the VM at the
+same instant. Install:
+```bash
+cp launchd/com.dcr.fub-refresh.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.dcr.fub-refresh.plist
+launchctl list | grep dcr          # expect com.dcr.ghl-refresh AND com.dcr.fub-refresh
+launchctl start com.dcr.fub-refresh   # smoke-test one run now
+```
+Logs: `logs/refresh-out.log` / `logs/refresh-err.log` (gitignored). `RunAtLoad`
+is false; missed fires coalesce into one catch-up on wake.
