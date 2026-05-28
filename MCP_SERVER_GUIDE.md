@@ -326,3 +326,226 @@ Steps:
   `run_select` cover the rest. Invest in the glossary.
 - **Docstrings are the UI** — write them for the model ("Use this when ...").
 - Secrets (`MCP_SQL_PASSWORD`, server IP) live only in `.env`; this repo is public.
+
+---
+
+## 9. Next steps — phased build plan for `fub_mcp`
+
+Each phase is independently shippable and has an acceptance check. Stop at any
+phase boundary and you still have something that works. Estimated total: ~half a
+day (the loader/views already exist; this is mostly the glossary + tools).
+
+### Phase 0 — Prereqs (~5 min)
+- [ ] Confirm the warehouse is reachable: `.venv/bin/python scripts/verify_sql_connection.py`
+      lists `fub.*` and `analytics.*`.
+- [ ] Confirm the views exist (`fub.vw_DailyLeadFunnel`, `vw_AgentLeaderboard`,
+      `vw_DealsByStage`, `analytics.vw_AllContacts`). If not, run
+      `scripts/load_to_sql.py` once (it applies the fub views) + apply the
+      analytics view.
+- **Accept:** both schemas inventory clean.
+
+### Phase 1 — Read-only login (~5 min, likely already done)
+- [ ] **Reuse the existing `dcr_ro` login** — it has `db_datareader` on the whole
+      `dcr_warehouse`, which already includes the `fub` and `analytics` schemas.
+      No new SQL needed; just point FUB's `.env` at it (Phase 2). Only create a
+      separate `fub_ro` if you want per-project credentials (§4 has the T-SQL).
+- [ ] Add `MCP_SQL_USER=dcr_ro` + `MCP_SQL_PASSWORD=<same as GHL>` to FUB's `.env`.
+- **Accept:** `sqlcmd`/pyodbc as `dcr_ro` can `SELECT` from `fub.People` but a
+      `DELETE` fails with a permission error.
+
+### Phase 2 — Package skeleton (~20 min)
+- [ ] Add to `pyproject.toml`: the `mcp` extra (`mcp[cli]>=1.0`; `pyodbc` is
+      already a core dep), `[project.scripts] fub-mcp = "fub_mcp.server:main"`,
+      and `src/fub_mcp` in `[tool.hatch.build.targets.wheel] packages`.
+- [ ] Create `src/fub_mcp/` with `__init__.py`, `__main__.py`, `config.py`
+      (copy GHL's verbatim — it already reads `GHL_SQL_*` + `MCP_SQL_*`), and
+      `db.py` (copy verbatim — schema-agnostic).
+- [ ] `pip install -e ".[mcp]"`.
+- **Accept:** `.venv/bin/python -c "from fub_mcp.db import run_select; print(run_select('SELECT TOP 1 PersonId FROM fub.People'))"`
+      returns a markdown row.
+
+### Phase 3 — Glossary + schema tools (~45 min, highest value)
+- [ ] Write `src/fub_mcp/schema.py` using the **draft glossary in §11**. Point
+      the `INFORMATION_SCHEMA` filters at `TABLE_SCHEMA='fub'` (and add an
+      `analytics` branch if you want `describe_table` to cover the cross-system
+      view).
+- **Accept:** `describe_schema()` prints the glossary + a live object list;
+      `describe_table('People')` prints 64 columns.
+
+### Phase 4 — Curated tools (~1–2 h)
+- [ ] `tools/base.py` (copy verbatim), `tools/__init__.py` (import your modules).
+- [ ] `tools/analytics.py` — port `agent_leaderboard`, `daily_lead_funnel`,
+      `deals_by_stage` against the `fub.vw_*` views (see §10 for the full list).
+- [ ] `tools/people.py` / `tools/deals.py` — `people_search`, `deal_detail`,
+      `event_activity`, `lead_source_breakdown`.
+- [ ] `tools/cross_system.py` — `cross_system_contacts` over `analytics.vw_AllContacts`.
+- **Accept:** each tool returns sane numbers that reconcile with the dashboard
+      (People 3,320 / Deals 228 / Events 3,209).
+
+### Phase 5 — Server + free-SQL (~15 min)
+- [ ] `server.py` = `FastMCP("fub-warehouse")` + register the two schema tools +
+      `REGISTRY` loop + the `run_select` escape hatch (copy GHL's `server.py`,
+      change the name and docstring schema to `fub`).
+- **Accept:** `python -m fub_mcp` starts without error;
+      `run_select("DELETE FROM fub.People")` returns `Rejected: ...`.
+
+### Phase 6 — Register + test (~15 min)
+- [ ] Register with your client (§5) as `fub-warehouse`.
+- [ ] `mcp dev -m fub_mcp` — call each tool from the Inspector.
+- [ ] Ask the model a real question ("top 3 agents by deals closed", "lead funnel
+      for the last 30 days") and confirm it picks the right tool.
+- **Accept:** the model answers from tools, not hallucinated SQL.
+
+### Phase 7 — Polish (optional)
+- [ ] Add a few unit tests (mirror `tests/test_load.py` style) for
+      `validate_select` (rejects writes) and the markdown formatter.
+- [ ] Document the server in `CLAUDE.md` (a new "§14 MCP server" section) and
+      add `MCP_SQL_*` to the run instructions.
+- [ ] Consider an MCP smoke check in `refresh_daily.py` (optional).
+
+---
+
+## 10. Proposed FUB tool catalog
+
+The concrete tools to build in Phase 4. Keep each one `@curated`, `Literal`-typed,
+`?`-parameterized, and backed by a view where one exists.
+
+| Tool | Backed by | Use for |
+|---|---|---|
+| `describe_schema` / `describe_table` | `INFORMATION_SCHEMA` | grounding (always first) |
+| `agent_leaderboard(order_by, limit)` | `fub.vw_AgentLeaderboard` ⨝ `fub.Users` | "top agents", "who owns the most leads/deals" |
+| `daily_lead_funnel(since, until, source, limit)` | `fub.vw_DailyLeadFunnel` | "funnel last week", "daily conversion" |
+| `deals_by_stage()` | `fub.vw_DealsByStage` | "pipeline by stage", "how many deals closed" |
+| `lead_source_breakdown(order_by, limit)` | `fub.People` GROUP BY `Source` | "where do leads come from", "best sources" |
+| `people_search(query, stage, source, limit)` | `fub.People` | "find a lead by name/email", "leads in stage X" |
+| `deal_detail(deal_id)` | `fub.Deals` ⨝ `fub.Stages` | "details of deal N" + its people/agents |
+| `event_activity(person_id, type, limit)` | `fub.Events` | "recent activity", "calls/emails for person N" |
+| `cross_system_contacts(group_by)` | `analytics.vw_AllContacts` | "total contacts across both CRMs" |
+| `run_select(sql, max_rows)` | guarded free SQL | anything the curated tools don't cover |
+
+---
+
+## 11. Draft FUB glossary (paste into `src/fub_mcp/schema.py`)
+
+This is the highest-leverage artifact — it teaches the model the FUB warehouse.
+Drop it in as `GLOSSARY` and refine as the schema evolves.
+
+```text
+# DCR warehouse — Follow Up Boss (SQL Server, schema `fub`)
+
+CRM data for Dana Capital Realty, extracted from Follow Up Boss. All timestamps
+are UTC (columns end in `Utc`). This connection is READ-ONLY. T-SQL dialect: use
+`SELECT TOP (n)`, NOT `LIMIT`; date math via `DATEADD`, `DATEDIFF`, `GETUTCDATE()`.
+Sister data from GoHighLevel lives in schema `ghl`; the two are unioned in
+`analytics.vw_AllContacts`.
+
+## Facts
+- `fub.People` (~3,320) — leads/contacts. PersonId (PK), FirstName/LastName/Name,
+  Emails/Phones (pipe-delimited), Stage (lead stage), Source (lead source),
+  AssignedUserId (owning agent; INTEGER -> join fub.Users.UserId), Tags
+  (pipe-delimited), CreatedUtc, UpdatedUtc, LastActivityUtc, 22 Custom* columns,
+  RawJson (full record). QUIRK: trashed leads are INCLUDED (Stage = 'Trash');
+  filter `Stage <> 'Trash'` for "active" people.
+- `fub.Deals` (~228) — transactions/opportunities. DealId (PK), Name, Value,
+  PipelineId, StageId (-> fub.Stages WHERE StageKind='Deal'), PrimaryPersonId +
+  PersonIds/PersonNames (pipe-delimited; the funnel link), PrimaryUserId +
+  UserIds/UserNames, CreatedUtc, CustomClosingDate. QUIRK: FUB has NO won/lost
+  status — a deal is "closed" when its StageId maps to a fub.Stages row with
+  ClosedStage = 1.
+- `fub.Events` (~3,209) — activity log: emails, calls, web visits, etc. EventId
+  (PK), PersonId (FK -> People), Type, timestamps. "Engaged" = a person with >=1 event.
+
+## Dimensions
+- `fub.Users` (4) — agents/staff. UserId (PK, INT), Name, Email, Role.
+- `fub.Pipelines` (2) — deal pipelines. PipelineId (PK), Name, StageCount, StageIds.
+- `fub.Stages` (20) — UNIFIED person + deal stages. StageId (PK), Name,
+  StageKind ('Person'|'Deal'), PipelineId (null for person stages), ClosedStage
+  (1 = a closed deal stage), Color. Deal stages live here, NOT in a person-only list.
+- `fub.Sources` (27) — lead sources. DERIVED from People (Derived='1'); not an
+  authoritative API pull (the API key is non-owner-scoped).
+- `fub.Tags` (32) — tags. PK is TagName (FUB tags have no id). DERIVED from People.
+
+## Analytics views (schema `fub`, prefix `vw_`) — prefer these for KPIs
+- `vw_DailyLeadFunnel` — per (LeadDate, LeadSource): LeadsCreated -> EngagedContacts
+  -> DealsCreated -> DealsClosed, with EngagedPct/DealPct/ClosedPct.
+- `vw_AgentLeaderboard` — per agent (UserId): LeadsAssigned, LeadsLast7/30,
+  EventsTotal/Last7, DealsTotal/Closed, PipelineValueOpen/Closed. (People.AssignedUserId
+  is INT; the view already handles the join to fub.Users.)
+- `vw_DealsByStage` — per stage: StageName, IsClosedStage, DealCount, TotalValue,
+  AvgValue, StageOrder.
+
+## Cross-system (schema `analytics`)
+- `analytics.vw_AllContacts` (~255,605) — UNION ALL of ghl.Contacts + fub.People,
+  normalized: ContactId, SourceSystem ('GoHighLevel'|'FollowUpBoss'), FullName,
+  Email, Phone, Source, DateAddedUtc. Use for "contacts across both CRMs".
+```
+
+---
+
+## 12. Environment variables (`.env`, gitignored)
+
+| Var | Purpose | Notes |
+|---|---|---|
+| `GHL_SQL_SERVER` | warehouse host (`<tailnet-ip-or-host>,1433`) | shared name with the loader/dashboard |
+| `GHL_SQL_DATABASE` | `dcr_warehouse` | shared |
+| `MCP_SQL_USER` | read-only login (e.g. `dcr_ro`) | **not** `sa` |
+| `MCP_SQL_PASSWORD` | read-only login password | secret — never commit |
+| `MCP_QUERY_TIMEOUT` | per-query timeout seconds (default 30) | optional |
+| `MCP_MAX_ROWS` | hard row ceiling to the model (default 500) | optional |
+
+`config.py` calls `load_dotenv` itself because the MCP subprocess inherits no
+shell env.
+
+---
+
+## 13. Open decisions to confirm before building
+
+1. **Reuse `dcr_ro` or make `fub_ro`?** Reuse is simpler (already has the grants);
+   a separate login gives per-project rotation/audit. Default: **reuse**.
+2. **Expose the `analytics` schema?** Recommended — `cross_system_contacts` is a
+   compelling tool. Means `describe_table` should also look up `analytics`.
+3. **Share one `.mcp.json` or one server per project?** Two servers
+   (`ghl-warehouse` + `fub-warehouse`) is cleanest; a model can use both. A future
+   unified `dcr-warehouse` server could expose all three schemas — only do that
+   if you want a single endpoint.
+4. **Ship `.mcp.json` in the repo?** It has no secrets (creds live in `.env`), so
+   committing it is fine and makes the server discoverable; gitignore it only if
+   you hardcode machine-specific paths you don't want public.
+
+---
+
+## 14. Handoff — start here in a fresh session
+
+**Goal:** build a read-only MCP server (`fub-warehouse`) so an LLM can answer
+questions about the FUB warehouse via curated tools. **Nothing is built yet** —
+this whole doc is the spec.
+
+**Read first (in order):**
+1. This file, top to bottom.
+2. The reference implementation in the sister project:
+   `/Users/smokestack/Projects/DCR/GHL_API/src/dcr_mcp/` — `server.py`, `db.py`,
+   `config.py`, `schema.py`, `tools/base.py`, `tools/analytics.py`. The FUB
+   server is a near-mechanical port of these.
+3. `CLAUDE.md` §12 (warehouse/views) and §2 (the `fub.*` tables) for the schema.
+
+**Do, in order:** follow §9 Phase 0 → 6. Copy `config.py` + `db.py` + `tools/base.py`
+verbatim; write `schema.py` from the §11 glossary; build the §10 tools; wire up
+`server.py`; register + test.
+
+**State of the world right now (2026-05-28):**
+- Warehouse loaded: `fub.*` (8 tables) + `fub.vw_*` (3 views) + `analytics.vw_AllContacts`,
+  all live in the shared `dcr_warehouse`. Loader: `scripts/load_to_sql.py`.
+- `pyodbc` is already a core dependency; ODBC Driver 18 is installed.
+- The `dcr_ro` read-only login exists (created during GHL's MCP build) and already
+  covers the `fub`/`analytics` schemas — reuse it.
+- The repo is **public** — keep all secrets in `.env` (gitignored).
+
+**Definition of done:** `python -m fub_mcp` starts; the Inspector lists
+`describe_schema`, the §10 tools, and `run_select`; a write via `run_select` is
+rejected; and the model answers "top agents by deals closed" + "lead funnel last
+30 days" correctly from the tools, with numbers matching the dashboard.
+
+**Gotchas (FUB-specific):** trashed people are in `fub.People` (filter
+`Stage <> 'Trash'`); deals have no won/lost status (use `fub.Stages.ClosedStage`);
+`People.AssignedUserId` is INT (cast when joining `fub.Users.UserId`); Sources/Tags
+are derived, not authoritative.
