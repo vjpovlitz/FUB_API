@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import streamlit as st
 
-from _brand import apply_brand, render_sidebar
+from _brand import apply_brand, render_filters, render_sidebar
 
 st.set_page_config(
     page_title="Dana Capital Realty · FUB",
@@ -32,7 +32,8 @@ PAGES = {
         st.Page("pages/0_Overview.py", title="Overview", icon=":material/dashboard:", default=True),
         st.Page("pages/1_Funnel.py", title="Lead Funnel", icon=":material/filter_alt:"),
         st.Page("pages/2_Agents.py", title="Agents", icon=":material/groups:"),
-        st.Page("pages/3_Deals.py", title="Deals", icon=":material/handshake:"),
+        st.Page("pages/3_Pipeline.py", title="Pipeline", icon=":material/handshake:"),
+        st.Page("pages/5_Activity.py", title="Activity", icon=":material/bolt:"),
         st.Page("pages/4_CrossSystem.py", title="Cross-System", icon=":material/hub:"),
     ],
     "Workspace": [
@@ -41,6 +42,7 @@ PAGES = {
     ],
 }
 
+render_filters()           # prominent global filters (source + date), above the nav
 nav = st.navigation(PAGES)
-render_sidebar()
+render_sidebar()           # user/login card + footer, pinned below the nav
 nav.run()

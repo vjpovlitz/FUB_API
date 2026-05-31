@@ -1,0 +1,44 @@
+# Keep the build context small + never ship secrets/data into the image.
+.git
+.gitignore
+.venv
+venv
+env
+__pycache__
+**/__pycache__
+*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+
+# Secrets & local env (provided at runtime via env_file, never baked in)
+.env
+.env.*
+!.env.example
+
+# Data & logs (CSVs may contain PII)
+data/
+logs/
+*.log
+scratch/
+
+# Local-only / internal docs (README.md is needed by pyproject, so keep it)
+HANDOFF.md
+MCP_TEST_PROMPTS.md
+MCP_SERVER_GUIDE.md
+nextsteps.md
+FUB_API_bootstrap_nextsteps.md
+task.md
+DATA_RULES.md
+
+# Host scheduler + editor + OS cruft
+launchd/
+.vscode
+.idea
+.DS_Store
+*.swp
+
+# Tests aren't needed in the runtime image
+tests/

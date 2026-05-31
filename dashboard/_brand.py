@@ -41,6 +41,7 @@ def _logo_b64() -> str:
 _CSS = f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Saira:wght@500;600;700&family=Montserrat:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
 
 html, body, .stApp, [class*="css"], [data-testid="stMarkdownContainer"],
 input, textarea, select, button {{ font-family: 'Montserrat', sans-serif; }}
@@ -99,16 +100,30 @@ h1, h2, h3, h4, h5 {{
     filter: drop-shadow(0 2px 7px rgba(0,0,0,.40));
 }}
 
+/* material icon glyphs (nav + buttons) — force the ligature font so the raw
+   token text ("dashboard", "filter_alt", …) renders as an actual icon */
+[data-testid="stIconMaterial"] {{
+    font-family: 'Material Symbols Rounded' !important;
+    font-weight: normal; font-style: normal; line-height: 1;
+    -webkit-font-feature-settings: 'liga'; font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased; letter-spacing: normal;
+    flex: 0 0 auto; margin-right: 6px;
+}}
+
 /* nav links -> glass pills */
 [data-testid="stSidebarNav"] {{ padding: 4px 6px 2px 6px; }}
+[data-testid="stSidebarNavLink"] {{ display: flex; align-items: center; }}
 [data-testid="stSidebarNav"] ul {{ gap: 2px; }}
 [data-testid="stSidebarNavLink"] {{
     border-radius: 11px; padding: 9px 12px; margin: 2px 4px;
-    border: 1px solid transparent; transition: all .18s ease;
+    border: 1px solid transparent;
+    transition: background .22s ease, border-color .22s ease,
+                box-shadow .22s ease, transform .16s ease;
 }}
 [data-testid="stSidebarNavLink"]:hover {{
-    background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.10);
-    transform: translateX(2px);
+    background: rgba(255,255,255,.10); border-color: rgba(255,255,255,.16);
+    transform: translateX(3px);
+    box-shadow: 0 4px 18px rgba(2,16,29,.28), inset 0 0 0 1px rgba(255,255,255,.06);
 }}
 [data-testid="stSidebarNavLink"] span, [data-testid="stSidebarNavLink"] p {{
     color: rgba(255,255,255,.80); font-weight: 500; font-size: .9rem;
@@ -145,25 +160,87 @@ h1, h2, h3, h4, h5 {{
 .dcr-urole {{ font-size: .72rem; color: #9fc6ff; margin-top: 1px; }}
 
 /* sidebar buttons -> glass */
+[data-testid="stSidebar"] .stButton {{ padding: 0 8px; }}
 [data-testid="stSidebar"] .stButton button {{
-    width: 100%; border-radius: 10px; font-weight: 600; font-size: .85rem;
-    background: rgba(255,255,255,.08); color: {WHITE};
-    border: 1px solid rgba(255,255,255,.16); transition: all .18s ease;
+    width: 100%; border-radius: 11px; font-weight: 600; font-size: .85rem;
+    padding: 9px 12px; background: rgba(255,255,255,.08); color: {WHITE};
+    border: 1px solid rgba(255,255,255,.16);
+    transition: background .22s ease, border-color .22s ease,
+                box-shadow .22s ease, transform .16s ease;
 }}
 [data-testid="stSidebar"] .stButton button:hover {{
     background: rgba(28,130,255,.30); border-color: rgba(28,130,255,.55);
-    box-shadow: 0 4px 16px rgba(28,130,255,.30); color: {WHITE};
+    box-shadow: 0 4px 18px rgba(28,130,255,.32); color: {WHITE};
+    transform: translateY(-1px);
+}}
+
+/* sidebar group label (matches nav section headers) */
+.dcr-side-label {{
+    color: {BLUE_LIGHT}; text-transform: uppercase; letter-spacing: 1.3px;
+    font-size: .66rem; font-weight: 700; padding: 2px 8px 6px 8px;
+}}
+
+/* ===== global filters (source + date), top of sidebar ===== */
+.dcr-filter-head {{
+    color: {BLUE_LIGHT}; text-transform: uppercase; letter-spacing: 1.4px;
+    font-size: .66rem; font-weight: 700; padding: 10px 14px 2px 14px;
+}}
+.dcr-filter-label {{
+    color: rgba(255,255,255,.78); font-weight: 600; font-size: .78rem;
+    letter-spacing: .3px; padding: 10px 14px 4px 14px;
+}}
+/* radio options -> stacked glass pills with smooth transitions */
+[data-testid="stSidebar"] [role="radiogroup"] {{ gap: 6px; padding: 0 8px; }}
+[data-testid="stSidebar"] [role="radiogroup"] label {{
+    width: 100%; margin: 0; padding: 8px 12px; border-radius: 11px;
+    background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.10);
+    transition: background .22s ease, border-color .22s ease,
+                box-shadow .22s ease, transform .16s ease; cursor: pointer;
+}}
+[data-testid="stSidebar"] [role="radiogroup"] label:hover {{
+    background: rgba(255,255,255,.11); border-color: rgba(255,255,255,.20);
+    transform: translateX(2px);
+    box-shadow: 0 3px 14px rgba(2,16,29,.25), inset 0 0 0 1px rgba(255,255,255,.06);
+}}
+[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {{
+    background: linear-gradient(135deg, rgba(28,130,255,.40), rgba(0,93,207,.26));
+    border-color: rgba(28,130,255,.70);
+    box-shadow: 0 4px 18px rgba(28,130,255,.32), inset 0 0 0 1px rgba(255,255,255,.08);
+}}
+[data-testid="stSidebar"] [role="radiogroup"] label p {{
+    font-weight: 600; font-size: .86rem; color: {WHITE};
+}}
+/* date-range select_slider -> glass track */
+[data-testid="stSidebar"] [data-testid="stSlider"] {{ padding: 2px 16px 0 16px; }}
+[data-testid="stSidebar"] [data-testid="stSlider"] [data-baseweb="slider"] div[role="slider"] {{
+    background: {BLUE_BRIGHT}; box-shadow: 0 0 0 4px rgba(28,130,255,.28);
+}}
+[data-testid="stSidebar"] [data-testid="stSliderTickBarMin"],
+[data-testid="stSidebar"] [data-testid="stSliderTickBarMax"],
+[data-testid="stSidebar"] [data-testid="stSlider"] [data-testid="stTickBar"] *,
+[data-testid="stSidebar"] [data-testid="stSlider"] label {{
+    color: rgba(255,255,255,.70) !important; font-weight: 600;
 }}
 
 /* sidebar footer + dividers + scrollbar */
 .dcr-side-foot {{
-    margin: 12px 14px 4px 14px; font-size: .68rem;
+    margin: 14px 16px 6px 16px; font-size: .68rem; text-align: center;
     color: rgba(255,255,255,.42); letter-spacing: .3px;
 }}
-[data-testid="stSidebar"] hr {{ border-color: rgba(255,255,255,.10); margin: 8px 0; }}
-[data-testid="stSidebar"] ::-webkit-scrollbar {{ width: 7px; }}
+[data-testid="stSidebar"] hr {{
+    border: none; height: 1px; margin: 12px 14px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.16), transparent);
+}}
+[data-testid="stSidebar"] {{ scroll-behavior: smooth; }}
+[data-testid="stSidebar"] ::-webkit-scrollbar {{ width: 8px; }}
+[data-testid="stSidebar"] ::-webkit-scrollbar-track {{ background: transparent; }}
 [data-testid="stSidebar"] ::-webkit-scrollbar-thumb {{
-    background: rgba(255,255,255,.16); border-radius: 4px;
+    background: rgba(255,255,255,.14); border-radius: 5px;
+    border: 2px solid transparent; background-clip: padding-box;
+    transition: background .2s ease;
+}}
+[data-testid="stSidebar"] ::-webkit-scrollbar-thumb:hover {{
+    background: rgba(28,130,255,.45); background-clip: padding-box;
 }}
 
 /* misc */
@@ -215,6 +292,41 @@ def _login_dialog() -> None:
     st.caption("Demo placeholder — credentials are not validated or stored.")
 
 
+def render_filters() -> None:
+    """Prominent global filters (CRM source + date range) for the sidebar.
+
+    Every analytics page respects both. Call in app.py BEFORE st.navigation so
+    the filters sit just under the brand logo, above the nav.
+    """
+    import datetime as _dt
+
+    from _db import DATE_PRESETS  # local import to avoid a cycle
+
+    with st.sidebar:
+        st.markdown('<div class="dcr-filter-head">Filters</div>', unsafe_allow_html=True)
+        st.markdown('<div class="dcr-filter-label">📡 Data source</div>',
+                    unsafe_allow_html=True)
+        st.radio(
+            "Data source", ["All systems", "Follow Up Boss", "GoHighLevel"],
+            key="source_system", label_visibility="collapsed",
+        )
+        st.markdown('<div class="dcr-filter-label">📅 Date range</div>',
+                    unsafe_allow_html=True)
+        custom = st.toggle("Custom range", key="date_custom")
+        if custom:
+            today = _dt.date.today()
+            st.date_input(
+                "Custom range", value=(today - _dt.timedelta(days=90), today),
+                max_value=today, key="date_custom_range",
+                format="MM/DD/YYYY", label_visibility="collapsed",
+            )
+        else:
+            st.select_slider(
+                "Date range", options=list(DATE_PRESETS.keys()), value="90d",
+                key="date_range", label_visibility="collapsed",
+            )
+
+
 def render_sidebar() -> None:
     """Render the glass user/login card + footer at the foot of the sidebar.
 
@@ -246,6 +358,17 @@ def render_sidebar() -> None:
             '<div class="dcr-side-foot">Dana Capital Realty &middot; FUB Warehouse</div>',
             unsafe_allow_html=True,
         )
+
+
+def money(value: float | int) -> str:
+    """Compact currency for KPI tiles: 3309500 -> '$3.31M', 12500 -> '$12.5K'."""
+    v = float(value or 0)
+    a = abs(v)
+    if a >= 1_000_000:
+        return f"${v / 1_000_000:.2f}M"
+    if a >= 1_000:
+        return f"${v / 1_000:.1f}K"
+    return f"${v:,.0f}"
 
 
 def style_fig(fig):

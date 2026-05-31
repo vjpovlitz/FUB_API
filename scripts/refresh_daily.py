@@ -48,7 +48,7 @@ from load_to_sql import connect, run_sql_file  # noqa: E402
 PYTHON = sys.executable
 RUN_ALL = REPO_ROOT / "scripts" / "run_all.py"
 LOAD_SQL = REPO_ROOT / "scripts" / "load_to_sql.py"
-ANALYTICS_VIEW = REPO_ROOT / "sql" / "analytics" / "vw_AllContacts.sql"
+ANALYTICS_DIR = REPO_ROOT / "sql" / "analytics"
 
 # Views that must return rows for the refresh to be considered healthy.
 SMOKE_VIEWS = [
@@ -56,6 +56,10 @@ SMOKE_VIEWS = [
     "fub.vw_AgentLeaderboard",
     "fub.vw_DealsByStage",
     "analytics.vw_AllContacts",
+    "analytics.vw_LeadFunnel",
+    "analytics.vw_AgentLeaderboard",
+    "analytics.vw_Opportunities",
+    "analytics.vw_Activity",
 ]
 
 
@@ -118,14 +122,18 @@ def main() -> int:
     if rc != 0:
         raise RefreshError(f"load (load_to_sql.py) failed (rc={rc})")
 
-    # 3. Re-apply the cross-system analytics view (depends on ghl.* + fub.*).
-    print("\n=== [3/4] Apply analytics.vw_AllContacts ===")
+    # 3. Re-apply ALL cross-system analytics views (depend on ghl.* + fub.*).
+    analytics_files = sorted(ANALYTICS_DIR.glob("*.sql"))
+    print(f"\n=== [3/4] Apply analytics views ({len(analytics_files)}) ===")
     if args.dry_run:
-        print(f"  (dry-run) would apply {ANALYTICS_VIEW.name}")
+        for f in analytics_files:
+            print(f"  (dry-run) would apply {f.name}")
     else:
         try:
             with connect(os.getenv("GHL_SQL_DATABASE", "dcr_warehouse")) as conn:
-                run_sql_file(conn, ANALYTICS_VIEW)
+                for f in analytics_files:
+                    print(f"  applying {f.name}", flush=True)
+                    run_sql_file(conn, f)
         except Exception as e:  # noqa: BLE001
             raise RefreshError(f"analytics view apply failed ({e})") from e
 

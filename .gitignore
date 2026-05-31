@@ -33,7 +33,13 @@ logs/
 # Data exports (CSVs may contain PII)
 data/exports/
 
-# Local-only planning docs (scratch specs / infra details — keep off the public repo)
-nextsteps.md
-FUB_API_bootstrap_nextsteps.md
-task.md
+# Markdown: internal docs stay local. Only key project docs are tracked —
+# everything else (handoffs, scratch specs, test prompts, infra notes) is ignored.
+*.md
+!CLAUDE.md
+!README.md
+!DATA_RULES.md
+!MCP_SERVER_GUIDE.md
+
+# Docker / runtime
+.env.docker

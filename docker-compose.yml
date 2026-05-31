@@ -1,0 +1,51 @@
+# FUB warehouse — local/portable stack.
+#
+# Connects to your EXISTING SQL Server warehouse (dcr_warehouse) using the
+# credentials in .env (GHL_SQL_* for the app, MCP_SQL_* for the MCP server).
+# Nothing here creates or owns a database — it only reads/writes the configured
+# target. Bring up the dashboard:
+#
+#   docker compose up dashboard          # -> http://localhost:8502
+#
+# Run the read-only MCP server (stdio; opt-in via the `mcp` profile):
+#
+#   docker compose run --rm mcp          # speak MCP over stdio
+#
+# NOTE: if your warehouse is on a Tailscale/VPN address, the Docker host must be
+# able to reach it. The simplest path is host networking (see the comment below)
+# or pointing GHL_SQL_SERVER at a host-reachable IP.
+
+services:
+  dashboard:
+    build: .
+    image: fub-warehouse:latest
+    container_name: fub-dashboard
+    command:
+      - streamlit
+      - run
+      - dashboard/app.py
+      - --server.port=8502
+      - --server.address=0.0.0.0
+      - --server.headless=true
+    ports:
+      - "8502:8502"
+    env_file:
+      - .env
+    restart: unless-stopped
+    # If the warehouse is only reachable from the host's network (e.g. Tailnet),
+    # uncomment to share the host network namespace (Linux):
+    # network_mode: host
+
+  # Read-only MCP server. stdio transport, so it's opt-in (profile) and meant to
+  # be exec'd/attached by an MCP client rather than run as a long-lived daemon.
+  mcp:
+    build: .
+    image: fub-warehouse:latest
+    container_name: fub-mcp
+    command: ["python", "-m", "fub_mcp"]
+    env_file:
+      - .env
+    stdin_open: true
+    tty: true
+    profiles:
+      - mcp

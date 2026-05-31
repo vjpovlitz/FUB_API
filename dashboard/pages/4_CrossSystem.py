@@ -10,7 +10,7 @@ import plotly.express as px
 import streamlit as st
 
 from _brand import BLUE, NAVY, header, style_fig
-from _db import q
+from _db import date_sql, q
 
 header("Cross-System Contacts",
        "analytics.vw_AllContacts — GoHighLevel + Follow Up Boss in one normalized view.")
@@ -45,11 +45,14 @@ with col_b:
     st.dataframe(by_sys, width="stretch", hide_index=True)
 
 st.subheader("New contacts per month (both systems)")
-monthly = q("""
+# Cross-system view always compares both CRMs; only the date window is applied.
+_window = date_sql("DateAddedUtc", leading="AND") or \
+    " AND DateAddedUtc >= DATEADD(MONTH, -12, GETUTCDATE())"
+monthly = q(f"""
     SELECT DATEFROMPARTS(YEAR(DateAddedUtc), MONTH(DateAddedUtc), 1) AS Month,
            SourceSystem, COUNT_BIG(*) AS Contacts
     FROM analytics.vw_AllContacts
-    WHERE DateAddedUtc >= DATEADD(MONTH, -12, GETUTCDATE())
+    WHERE 1=1 {_window}
     GROUP BY DATEFROMPARTS(YEAR(DateAddedUtc), MONTH(DateAddedUtc), 1), SourceSystem
     ORDER BY Month;
 """)
