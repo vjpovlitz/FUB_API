@@ -40,6 +40,7 @@ RUN pip install ".[dashboard,mcp]"
 COPY dashboard/ ./dashboard/
 COPY sql/ ./sql/
 COPY scripts/ ./scripts/
+COPY demo/ ./demo/
 COPY .streamlit/ ./.streamlit/
 
 # non-root runtime

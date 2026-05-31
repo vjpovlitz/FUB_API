@@ -44,5 +44,28 @@ The container connects to your **existing** SQL Server warehouse via the
 warehouse is on a Tailscale/VPN address, make sure the Docker host can reach it
 (on Linux, uncomment `network_mode: host` in `docker-compose.yml`).
 
+### Self-contained demo (no external DB, no real data)
+
+For a zero-setup walkthrough — bundled SQL Server + synthetic, non-PII data —
+use the demo compose file:
+
+```bash
+docker compose -f docker-compose.demo.yml up --build
+# -> http://localhost:8502  (synthetic data spanning both CRMs)
+```
+
+It boots a local SQL Server, seeds `dcr_demo` with fake contacts / deals /
+activity (see `demo/seed_demo.py` — names from fixed lists, `@example.com`
+emails, random dates; **no Follow Up Boss or GoHighLevel data is touched**),
+then starts the dashboard against it. Tear down with:
+
+```bash
+docker compose -f docker-compose.demo.yml down -v   # -v also drops the demo DB volume
+```
+
+> Apple Silicon: SQL Server runs under amd64 emulation (pinned in the compose
+> file); first boot takes a couple of minutes and needs ~2.5 GB RAM allotted to
+> Docker. The demo SA password is a throwaway local credential, not a secret.
+
 See `CLAUDE.md` for the full handoff and `DATA_RULES.md` for the canonical
 extraction rules.

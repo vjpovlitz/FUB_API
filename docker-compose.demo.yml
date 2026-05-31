@@ -1,0 +1,63 @@
+# Self-contained DEMO stack — no external database, no real data.
+#
+#   docker compose -f docker-compose.demo.yml up --build
+#   -> dashboard at http://localhost:8502 (synthetic data, both CRMs)
+#
+# Brings up a bundled SQL Server, seeds it with SYNTHETIC non-PII data, then
+# starts the dashboard pointed at it. The SA password here is a throwaway local
+# credential — fine to keep in the file; it never touches the real warehouse.
+#
+# Apple Silicon: SQL Server runs under amd64 emulation (platform pinned below);
+# first boot can take a couple of minutes and needs ~2.5 GB RAM for Docker.
+
+x-demo-db: &demo-db
+  GHL_SQL_SERVER: "sqlserver,1433"
+  GHL_SQL_USER: "sa"
+  GHL_SQL_PASSWORD: "Demo_Passw0rd!"
+  GHL_SQL_DATABASE: "dcr_demo"
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    container_name: fub-demo-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Demo_Passw0rd!"
+      MSSQL_PID: "Developer"
+    ports:
+      - "14333:1433"          # host:container — avoids clashing with a local 1433
+    volumes:
+      - demo_mssql:/var/opt/mssql
+
+  # One-shot: waits for SQL Server, creates dcr_demo + analytics.* tables, seeds.
+  seed:
+    build: .
+    image: fub-warehouse:latest
+    container_name: fub-demo-seed
+    command: ["python", "demo/seed_demo.py"]
+    environment: *demo-db
+    depends_on:
+      - sqlserver
+    restart: "no"
+
+  dashboard:
+    build: .
+    image: fub-warehouse:latest
+    container_name: fub-demo-dashboard
+    command:
+      - streamlit
+      - run
+      - dashboard/app.py
+      - --server.port=8502
+      - --server.address=0.0.0.0
+      - --server.headless=true
+    environment: *demo-db
+    ports:
+      - "8502:8502"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+volumes:
+  demo_mssql:
