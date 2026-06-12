@@ -33,6 +33,9 @@ DEFAULT_BASE_URL = "https://api.followupboss.com/v1"
 
 _MAX_429_RETRIES = 3
 _DEFAULT_RETRY_AFTER_S = 5.0
+# Transient network failures (read/connect timeouts, dropped connections) must not
+# abort a multi-hour push — retry with capped exponential backoff before giving up.
+_MAX_TRANSIENT_RETRIES = 5
 
 
 class FUBClient:
@@ -41,7 +44,7 @@ class FUBClient:
         credentials: BasicAuthCredentials,
         *,
         base_url: str = DEFAULT_BASE_URL,
-        timeout: float = 30.0,
+        timeout: float = 60.0,
         throttle: Throttle | None = None,
     ):
         self.credentials = credentials
@@ -90,9 +93,17 @@ class FUBClient:
         }
 
         attempt = 0
+        transient = 0
         while True:
             self.throttle.before_request()
-            resp = self._http.request(method, url, params=params, json=json, headers=headers)
+            try:
+                resp = self._http.request(method, url, params=params, json=json, headers=headers)
+            except (httpx.TimeoutException, httpx.TransportError) as exc:
+                if transient >= _MAX_TRANSIENT_RETRIES:
+                    raise FUBAPIError(f"Transient network error after retries: {exc}") from exc
+                transient += 1
+                time.sleep(min(2 ** transient, 30))
+                continue
             self.throttle.observe(resp.headers)
 
             if resp.status_code == 429 and attempt < _MAX_429_RETRIES:

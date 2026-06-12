@@ -14,6 +14,15 @@ import sys
 import httpx
 from dotenv import load_dotenv
 
+# Honor the OS trust store (Norton TLS scanning on Windows presents a leaf cert
+# signed by a root that's in the Windows store but not in certifi's bundle).
+try:
+    import truststore
+
+    truststore.inject_into_ssl()
+except Exception:  # noqa: BLE001 — best-effort; no-op where truststore is absent
+    pass
+
 load_dotenv()
 
 API_KEY = os.getenv("FUB_API_KEY", "").strip()
