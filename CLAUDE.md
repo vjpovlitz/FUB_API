@@ -16,11 +16,13 @@ CRM data into **SQL-Server-shaped CSVs** for a downstream warehouse load.
 - **Vendor:** Follow Up Boss — `api.followupboss.com/v1`
 - **Auth:** HTTP Basic — API key as username, empty password. Plus
   `X-System` / `X-System-Key` integration headers.
-- **Working dir:** `/Users/smokestack/Projects/FUB_API`
+- **Working dir:** `C:\Users\vjpov\Codebase\FUB_API` (Windows box, 2026-06+);
+  the macOS-era paths in older sections (`/Users/smokestack/...`, launchd,
+  `.venv/bin/...`) are historical — on Windows use `python` directly and the
+  Task Scheduler wrappers in §15.
 - **Account:** redacted from public repo — see internal notes / `.env`.
-- **Last worked:** 2026-05-27. All three core entities extracted + SQL load
-  scripts generated. Next up: dimension tables + referential-integrity check
-  (see §8).
+- **Last worked:** 2026-06-12. Niche → FUB lead push pipeline live (see §15);
+  warehouse refresh dormant on Windows until a SQL Server target exists.
 
 ### Why CSVs and not direct DB writes?
 
@@ -742,3 +744,67 @@ model description) in `tools/<domain>.py`, ensure the module is imported in
 
 **Backlog:** more tools as needed (tag/source ROI once owner-scoped key lands);
 optionally a unified `dcr-warehouse` server exposing `ghl` + `fub` + `analytics`.
+
+---
+
+## 15. Lead push pipeline — Niche/RPRD → FUB (Windows era, 2026-06)
+
+Direction reversed from everything above: this WRITES leads into the live FUB
+CRM. Two feeds, one idempotency ledger.
+
+**Feeds:**
+1. **Niche Data** (`customers-api.nichedata.ai`) — foreclosure/pre-probate
+   notices for the DC/Baltimore metro. Client in `src/niche_api/` (JSON:API
+   envelope, Bearer `NICHE_DATA_TOKEN`, fixed 15/page server-side; see
+   `niche_api/client.py` + `config.py` for verified quirks).
+2. **RPRD lead engine** — scored distressed-seller parcels from the CoWork
+   project at `C:\Users\vjpov\Codebase\DCR\Claude CoWork Project\RPRD-Leads\
+   RPRD-Leads` (override via `RPRD_WAREHOUSE` / `RPRD_LEAD_SCORE`).
+   **RPRD → FUB push is DISABLED** (founder, 2026-06-10: RPRD leads have no
+   phones; he deleted all 10,217 previously pushed). RPRD now goes through
+   `scripts/export_skiptrace_csv.py` → DataSift skip-trace CSV instead.
+
+**Core module — `src/fub_api/pusher.py`:** `FubPusher.upsert()` keyed on a
+stable external id (`niche:<id>` / `rprd:<parcel_id>`) recorded in an
+append-only JSONL ledger (`data/exports/push_ledger.jsonl`, gitignored).
+Re-runs skip unchanged leads (content hash), PUT changed ones (tags unioned so
+manual tags survive), POST only new ones. Every lead gets a signal tag plus the
+umbrella `niche⚡️ auto-import` tag → one FUB filter bulk-deletes the whole
+import (founder requirement).
+
+**THE LEDGER IS THE ONLY IRREPLACEABLE STATE.** Losing it means the next push
+re-creates every active lead as a duplicate. Never commit it (live CRM ids);
+back it up before machine changes (`Documents\fub_ledger_backup_*.zip`).
+`scripts/reconcile_ledger.py` prunes entries whose FUB person was bulk-deleted
+in the app (run report-only first; see its docstring).
+
+**Scripts:** `push_niche_to_fub.py` (quality filter: filed ≤ ~8 months AND not
+sold/auction-passed — `drop_reason()`, unit-tested in `tests/test_push_filter.py`;
+sale-change notes + high-equity owner alerts), `push_rprd_to_fub.py` (dormant),
+`push_all_to_fub.py` (combined entry point, one exit code),
+`export_skiptrace_csv.py` (delta batches → `data/exports/skiptrace/`, own
+ledger), `niche_smoke.py` (probe), `niche_to_fub_test.py` (proven mappers —
+PRODUCTION push imports them; not a throwaway). Everything is **dry-run by
+default**; `--push` goes live.
+
+**Scheduling (Windows Task Scheduler, NOT launchd):**
+- `scripts/run_fub_push.ps1` → task **"FUB Niche Push"** (9:00/15:00/21:00,
+  30 min after the RPRD scrape). Runs `push_all_to_fub.py --only niche --push`
+  then the skip-trace delta export. Logs to `logs\push-*.log`.
+- `scripts/run_fub_refresh.ps1` → task **"FUB Warehouse Refresh"** — ships
+  DISABLED: `GHL_SQL_*` points at localhost and no SQL Server runs on this box.
+  The macOS-era warehouse (§12) is dormant until a new SQL target exists; the
+  demo stack (commit 93a608c) bundles a synthetic-data SQL Server for demos.
+
+**Windows quirks:** Norton MITMs TLS — `src/_tls_bootstrap.py` (+ the
+`truststore` dep, win32 only) routes cert verification through the OS store;
+imported by `fub_api/__init__`. Alerts (`fub_api/alerts.py`) gained optional
+Twilio SMS (`TWILIO_*` / `ALERT_SMS_TO` in `.env`). `FUBClient` retries
+transient network errors (5x, capped backoff) so multi-hour pushes survive
+Wi-Fi blips.
+
+**FUB write API knowledge (verified live):** `POST /people` rejects top-level
+`name` → always firstName/lastName (`pusher.split_owner_name`); number-typed
+custom fields accept INTEGERS only (floats silently dropped);
+`/peopleRelationships` rejects `name` (send the parts); new people auto-assign
+to the account owner; `customSaleStatus` field was created via the API 2026-06-10.
