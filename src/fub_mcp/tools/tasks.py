@@ -11,7 +11,7 @@ def task_summary(user: str, since: str | None = None, until: str | None = None) 
     Use for "how many tasks did X set / complete / miss this week". `user` is an
     agent name or UserId. `since`/`until` are ISO dates 'YYYY-MM-DD' (until is
     EXCLUSIVE); defaults to the last 7 days. Definitions:
-      - Set       = tasks the agent CREATED in the window (CreatedById)
+      - Set       = tasks the agent authored/last-touched in the window (UpdatedById)
       - Completed = tasks ASSIGNED to the agent and marked done in the window
       - Missed    = tasks ASSIGNED to the agent, due in the window, past due, not done
     For a calendar week pass since=Monday and until=the following Monday.
@@ -26,16 +26,16 @@ def task_summary(user: str, since: str | None = None, until: str | None = None) 
     s, u = default_window(since, until)
     uid_int = int(uid)
     sql = (
-        "SELECT ? AS Agent, "
-        "(SELECT COUNT_BIG(*) FROM fub.Tasks "
-        " WHERE CreatedById = ? AND CreatedUtc >= ? AND CreatedUtc < ?) AS TasksSet, "
-        "(SELECT COUNT_BIG(*) FROM fub.Tasks "
-        " WHERE AssignedUserId = ? AND IsCompleted = 1 "
-        "   AND CompletedUtc >= ? AND CompletedUtc < ?) AS TasksCompleted, "
-        "(SELECT COUNT_BIG(*) FROM fub.Tasks "
-        " WHERE AssignedUserId = ? AND IsCompleted = 0 AND DueDate IS NOT NULL "
-        "   AND DueDate < CAST(GETUTCDATE() AS DATE) "
-        "   AND DueDate >= ? AND DueDate < ?) AS TasksMissed"
+        'SELECT %s AS "Agent", '
+        '(SELECT COUNT(*) FROM fub."Tasks" '
+        ' WHERE "UpdatedById" = %s AND "UpdatedUtc" >= %s AND "UpdatedUtc" < %s) AS "TasksSet", '
+        '(SELECT COUNT(*) FROM fub."Tasks" '
+        ' WHERE "AssignedUserId" = %s AND "IsCompleted" = true '
+        '   AND "CompletedUtc" >= %s AND "CompletedUtc" < %s) AS "TasksCompleted", '
+        '(SELECT COUNT(*) FROM fub."Tasks" '
+        ' WHERE "AssignedUserId" = %s AND "IsCompleted" = false AND "DueDate" IS NOT NULL '
+        '   AND "DueDate" < (now() AT TIME ZONE \'utc\')::date '
+        '   AND "DueDate" >= %s AND "DueDate" < %s) AS "TasksMissed"'
     )
     params = [name, uid_int, s, u, uid_int, s, u, uid_int, s, u]
     out = md(sql, params, cap=1)

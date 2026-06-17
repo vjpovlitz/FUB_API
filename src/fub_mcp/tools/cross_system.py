@@ -1,4 +1,4 @@
-"""Cross-system tool over analytics.vw_AllContacts (GoHighLevel + Follow Up Boss)."""
+"""Cross-system tool over analytics.vw_allcontacts (GoHighLevel + Follow Up Boss)."""
 from __future__ import annotations
 
 from typing import Literal
@@ -18,18 +18,18 @@ def cross_system_contacts(group_by: Literal["system", "source"] = "system", limi
     if group_by == "source":
         limit = max(1, min(limit, 200))
         sql = (
-            "SELECT TOP (?) ISNULL(NULLIF(Source,''),'(unknown)') AS Source, "
-            "COUNT_BIG(*) AS Contacts "
-            "FROM analytics.vw_AllContacts "
-            "GROUP BY ISNULL(NULLIF(Source,''),'(unknown)') "
-            "ORDER BY Contacts DESC"
+            'SELECT COALESCE(NULLIF("Source",\'\'),\'(unknown)\') AS "Source", '
+            'COUNT(*) AS "Contacts" '
+            'FROM analytics.vw_allcontacts '
+            'GROUP BY COALESCE(NULLIF("Source",\'\'),\'(unknown)\') '
+            'ORDER BY "Contacts" DESC LIMIT %s'
         )
         return md(sql, [limit], cap=limit)
     sql = (
-        "SELECT SourceSystem, COUNT_BIG(*) AS Contacts, "
-        "SUM(CASE WHEN COALESCE(Email,'') <> '' THEN 1 ELSE 0 END) AS WithEmail, "
-        "SUM(CASE WHEN COALESCE(Phone,'') <> '' THEN 1 ELSE 0 END) AS WithPhone "
-        "FROM analytics.vw_AllContacts "
-        "GROUP BY SourceSystem ORDER BY Contacts DESC"
+        'SELECT "SourceSystem", COUNT(*) AS "Contacts", '
+        'SUM(CASE WHEN COALESCE("Email",\'\') <> \'\' THEN 1 ELSE 0 END) AS "WithEmail", '
+        'SUM(CASE WHEN COALESCE("Phone",\'\') <> \'\' THEN 1 ELSE 0 END) AS "WithPhone" '
+        'FROM analytics.vw_allcontacts '
+        'GROUP BY "SourceSystem" ORDER BY "Contacts" DESC'
     )
     return md(sql, cap=10)

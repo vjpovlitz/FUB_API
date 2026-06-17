@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime as _dt
 from typing import Callable
 
-import pyodbc
+import psycopg
 
 from ..db import MAX_ROWS_CEILING, run_readonly, to_markdown
 
@@ -27,8 +27,8 @@ def md(sql: str, params: list | None = None, cap: int = 200) -> str:
     """Run a read query and format as markdown, or a friendly error string."""
     try:
         cols, rows, truncated = run_readonly(sql, params=params, max_rows=cap)
-    except pyodbc.Error as e:
-        msg = str(e).split("]")[-1].strip()
+    except psycopg.Error as e:
+        msg = str(e).strip().splitlines()[0]
         return f"Warehouse unavailable or query failed: {msg}"
     return to_markdown(cols, rows, truncated, min(cap, MAX_ROWS_CEILING))
 
@@ -38,7 +38,7 @@ def check_date(value: str, label: str) -> str:
     try:
         _dt.date.fromisoformat(value)
     except ValueError:
-        raise ValueError(f"{label} must be an ISO date 'YYYY-MM-DD', got {value!r}.")
+        raise ValueError(f"{label} must be an ISO date 'YYYY-MM-DD', got {value!r}.") from None
     return value
 
 
@@ -59,10 +59,12 @@ def resolve_users(user: str) -> list[tuple[str, str]]:
     if not u:
         return []
     if u.lstrip("-").isdigit():
-        _, rows, _ = run_readonly("SELECT UserId, Name FROM fub.Users WHERE UserId = ?", params=[u])
+        _, rows, _ = run_readonly(
+            'SELECT "UserId", "Name" FROM fub."Users" WHERE "UserId" = %s', params=[u]
+        )
     else:
         _, rows, _ = run_readonly(
-            "SELECT UserId, Name FROM fub.Users WHERE Name LIKE ?", params=[f"%{u}%"]
+            'SELECT "UserId", "Name" FROM fub."Users" WHERE "Name" ILIKE %s', params=[f"%{u}%"]
         )
     return [(str(r[0]), str(r[1] or "")) for r in rows]
 

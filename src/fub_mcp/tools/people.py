@@ -21,25 +21,26 @@ def people_search(
     """
     limit = max(1, min(limit, 200))
     where: list[str] = []
-    params: list = [limit]
+    params: list = []
     if not include_trash:
-        where.append("Stage <> 'Trash'")
+        where.append('"Stage" <> \'Trash\'')
     if query:
-        where.append("(Name LIKE ? OR PrimaryEmail LIKE ? OR PrimaryPhone LIKE ?)")
+        where.append('("Name" ILIKE %s OR "PrimaryEmail" ILIKE %s OR "PrimaryPhone" ILIKE %s)')
         like = f"%{query}%"
         params += [like, like, like]
     if stage:
-        where.append("Stage = ?")
+        where.append('"Stage" = %s')
         params.append(stage)
     if source:
-        where.append("Source = ?")
+        where.append('"Source" = %s')
         params.append(source)
+    params.append(limit)  # LIMIT is the LAST placeholder
     clause = (" WHERE " + " AND ".join(where)) if where else ""
     sql = (
-        "SELECT TOP (?) PersonId, Name, PrimaryEmail, PrimaryPhone, Stage, Source, "
-        "AssignedTo, CreatedUtc, LastActivityUtc "
-        f"FROM fub.People{clause} "
-        "ORDER BY LastActivityUtc DESC"
+        'SELECT "PersonId", "Name", "PrimaryEmail", "PrimaryPhone", "Stage", "Source", '
+        '"AssignedTo", "UpdatedUtc", "LastActivityUtc" '
+        f'FROM fub."People"{clause} '
+        'ORDER BY "LastActivityUtc" DESC NULLS LAST LIMIT %s'
     )
     return md(sql, params, cap=limit)
 
@@ -58,18 +59,19 @@ def event_activity(
     """
     limit = max(1, min(limit, 200))
     where: list[str] = []
-    params: list = [limit]
+    params: list = []
     if person_id:
-        where.append("PersonId = ?")
+        where.append('"PersonId" = %s')
         params.append(person_id)
     if type:
-        where.append("Type = ?")
+        where.append('"Type" = %s')
         params.append(type)
+    params.append(limit)  # LIMIT is the LAST placeholder
     clause = (" WHERE " + " AND ".join(where)) if where else ""
     sql = (
-        "SELECT TOP (?) EventId, PersonId, Type, Source, "
-        "COALESCE(OccurredUtc, CreatedUtc) AS WhenUtc, LEFT(Message, 80) AS Message "
-        f"FROM fub.Events{clause} "
-        "ORDER BY COALESCE(OccurredUtc, CreatedUtc) DESC"
+        'SELECT "EventId", "PersonId", "Type", "Source", '
+        'COALESCE("OccurredUtc", "UpdatedUtc") AS "WhenUtc", LEFT("Message", 80) AS "Message" '
+        f'FROM fub."Events"{clause} '
+        'ORDER BY COALESCE("OccurredUtc", "UpdatedUtc") DESC NULLS LAST LIMIT %s'
     )
     return md(sql, params, cap=limit)

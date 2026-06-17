@@ -24,12 +24,12 @@ def agent_leaderboard(order_by: AgentSort = "LeadsAssigned", limit: int = 20) ->
     limit = max(1, min(limit, 100))
     order_by = check_choice(order_by, get_args(AgentSort), "order_by")
     sql = (
-        "SELECT TOP (?) ISNULL(NULLIF(u.Name,''), lb.UserId) AS Agent, u.Role, "
-        "lb.LeadsAssigned, lb.LeadsLast30, lb.EventsTotal, lb.DealsTotal, "
-        "lb.DealsClosed, lb.PipelineValueOpen, lb.PipelineValueClosed "
-        "FROM fub.vw_AgentLeaderboard lb "
-        "LEFT JOIN fub.Users u ON u.UserId = lb.UserId "
-        f"ORDER BY lb.[{order_by}] DESC"
+        'SELECT COALESCE(NULLIF(u."Name",\'\'), lb."UserId") AS "Agent", u."Role", '
+        'lb."LeadsAssigned", lb."LeadsLast30", lb."EventsTotal", lb."DealsTotal", '
+        'lb."DealsClosed", lb."PipelineValueOpen", lb."PipelineValueClosed" '
+        'FROM fub.vw_agentleaderboard lb '
+        'LEFT JOIN fub."Users" u ON u."UserId" = lb."UserId" '
+        f'ORDER BY lb."{order_by}" DESC NULLS LAST LIMIT %s'
     )
     return md(sql, [limit], cap=limit)
 
@@ -41,7 +41,7 @@ def daily_lead_funnel(
     source: str | None = None,
     limit: int = 100,
 ) -> str:
-    """Daily funnel (leads -> engaged -> deals created -> deals closed) with percentages.
+    """Daily funnel (engaged contacts -> deals closed) with conversion percentages.
 
     Use for "lead funnel for last week", "daily conversion trend". `since`/`until`
     are ISO dates 'YYYY-MM-DD' (optional); `source` filters one lead source.
@@ -49,21 +49,22 @@ def daily_lead_funnel(
     """
     limit = max(1, min(limit, MAX_ROWS_CEILING))
     where = ["1 = 1"]
-    params: list = [limit]
+    params: list = []
     if since:
-        where.append("LeadDate >= ?")
+        where.append('"LeadDate" >= %s')
         params.append(check_date(since, "since"))
     if until:
-        where.append("LeadDate <= ?")
+        where.append('"LeadDate" <= %s')
         params.append(check_date(until, "until"))
     if source:
-        where.append("LeadSource = ?")
+        where.append('"LeadSource" = %s')
         params.append(source)
+    params.append(limit)  # LIMIT is the LAST placeholder
     sql = (
-        "SELECT TOP (?) LeadDate, LeadSource, LeadsCreated, EngagedContacts, "
-        "DealsCreated, DealsClosed, EngagedPct, DealPct, ClosedPct "
-        f"FROM fub.vw_DailyLeadFunnel WHERE {' AND '.join(where)} "
-        "ORDER BY LeadDate DESC, LeadsCreated DESC"
+        'SELECT "LeadDate", "LeadSource", "EngagedContacts", "DealsClosed", '
+        '"EngagedPct", "DealPct", "ClosedPct" '
+        f'FROM fub.vw_dailyleadfunnel WHERE {" AND ".join(where)} '
+        'ORDER BY "LeadDate" DESC, "EngagedContacts" DESC LIMIT %s'
     )
     return md(sql, params, cap=limit)
 
@@ -77,8 +78,8 @@ def deals_by_stage() -> str:
     marks a closed stage (FUB has no won/lost status).
     """
     sql = (
-        "SELECT StageName, IsClosedStage, DealCount, TotalValue, AvgValue, StageOrder "
-        "FROM fub.vw_DealsByStage ORDER BY StageOrder"
+        'SELECT "StageName", "IsClosedStage", "DealCount", "TotalValue", "AvgValue", "StageOrder" '
+        'FROM fub.vw_dealsbystage ORDER BY "StageOrder"'
     )
     return md(sql, cap=100)
 
@@ -97,12 +98,12 @@ def lead_source_breakdown(order_by: SourceSort = "People", limit: int = 25, min_
     limit = max(1, min(limit, 200))
     order_by = check_choice(order_by, get_args(SourceSort), "order_by")
     sql = (
-        "SELECT TOP (?) ISNULL(NULLIF(Source,''),'(unknown)') AS Source, "
-        "COUNT_BIG(*) AS People, "
-        "SUM(CASE WHEN Stage <> 'Trash' THEN 1 ELSE 0 END) AS ActivePeople "
-        "FROM fub.People "
-        "GROUP BY ISNULL(NULLIF(Source,''),'(unknown)') "
-        "HAVING COUNT_BIG(*) >= ? "
-        f"ORDER BY [{order_by}] DESC"
+        'SELECT COALESCE(NULLIF("Source",\'\'),\'(unknown)\') AS "Source", '
+        'COUNT(*) AS "People", '
+        'SUM(CASE WHEN "Stage" <> \'Trash\' THEN 1 ELSE 0 END) AS "ActivePeople" '
+        'FROM fub."People" '
+        'GROUP BY COALESCE(NULLIF("Source",\'\'),\'(unknown)\') '
+        'HAVING COUNT(*) >= %s '
+        f'ORDER BY "{order_by}" DESC LIMIT %s'
     )
-    return md(sql, [limit, max(0, min_count)], cap=limit)
+    return md(sql, [max(0, min_count), limit], cap=limit)

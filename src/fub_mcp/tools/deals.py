@@ -12,11 +12,11 @@ def deal_detail(deal_id: str) -> str:
     IsClosedStage comes from the deal's stage (FUB has no won/lost status).
     """
     sql = (
-        "SELECT TOP (1) d.DealId, d.Name, d.Status, d.Price, d.PipelineName, "
-        "d.StageName, s.IsClosedStage, d.PersonNames, d.UserNames, "
-        "d.ProjectedCloseDate, d.CustomClosingDate, d.EnteredStageUtc, d.CreatedUtc "
-        "FROM fub.Deals d "
-        "LEFT JOIN fub.vw_DealsByStage s ON s.StageId = d.StageId "
-        "WHERE d.DealId = ?"
+        'SELECT d."DealId", d."Name", d."Status", d."Price", d."PipelineName", '
+        'd."StageName", s."IsClosedStage", d."PersonNames", d."UserNames", '
+        'd."ProjectedCloseDate", d."CustomClosingDate", d."EnteredStageUtc" '
+        'FROM fub."Deals" d '
+        'LEFT JOIN fub.vw_dealsbystage s ON s."StageId" = d."StageId" '
+        'WHERE d."DealId" = %s LIMIT 1'
     )
     return md(sql, [deal_id], cap=1)

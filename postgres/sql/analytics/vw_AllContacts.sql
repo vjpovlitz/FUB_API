@@ -24,5 +24,7 @@ SELECT
     CAST("PrimaryEmail" AS VARCHAR(256)),
     CAST("PrimaryPhone" AS VARCHAR(64)),
     CAST("Source"       AS VARCHAR(128)),
-    CAST("CreatedUtc"   AS TIMESTAMP(3))
+    CAST("UpdatedUtc"   AS TIMESTAMP(3))   -- fub.People has no created/added ts
 FROM fub."People";
+
+GRANT SELECT ON analytics.vw_allcontacts TO dcr_ro;
