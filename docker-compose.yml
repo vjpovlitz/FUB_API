@@ -49,6 +49,7 @@ services:
     tty: true
     profiles:
       - mcp
+    networks: [dcr]   # reach the shared `db` (PG_HOST=db) on ghl_api_default
 
   # One-shot ETL: create fub.* + load the exported CSVs into the shared Postgres
   # dcr_warehouse (owned by DCR/GHL_API's `db` service, or a managed Postgres).
@@ -67,3 +68,11 @@ services:
     restart: "no"
     profiles:
       - etl
+    networks: [dcr]
+
+# Share the GHL_API Postgres container's network (the `db` service lives there,
+# on network ghl_api_default). Lets fub-etl resolve `db` with PG_HOST=db.
+networks:
+  dcr:
+    external: true
+    name: ghl_api_default
