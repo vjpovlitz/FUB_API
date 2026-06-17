@@ -32,9 +32,17 @@ dashboard = [
     "streamlit>=1.36",
     "pandas>=2.2",
     "plotly>=5.22",
+    "psycopg[binary]>=3.2",   # Postgres backend (default); pyodbc kept as fallback
 ]
 mcp = [
     "mcp[cli]>=1.0",
+    "psycopg[binary]>=3.2",   # Postgres backend (default); pyodbc kept as fallback
+]
+agent = [
+    "anthropic>=0.69",
+]
+postgres = [
+    "psycopg[binary]>=3.2",
 ]
 
 [project.scripts]

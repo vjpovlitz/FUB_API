@@ -1,9 +1,14 @@
 """Shared DB connection + cached query helper for the FUB Streamlit dashboard.
 
-Reads the same SQL Server warehouse as GHL_API (dcr_warehouse), querying the
-`fub.*` tables/views and the cross-system `analytics.*` views. Connection vars
-are the shared GHL_SQL_* names (see .env). Self-signed cert on the server, so
-the connect string must keep TrustServerCertificate=yes;Encrypt=no;.
+Primary backend is **PostgreSQL** (shared dcr_warehouse on the VPS, read via the
+PG_* env as the read-only `dcr_ro` role), querying the `fub.*` tables/views and the
+cross-system `analytics.*` views. The legacy **SQL Server** path (pyodbc, GHL_SQL_*)
+is retained as a fallback, selected with `FUB_DB_BACKEND=sqlserver`. Drivers import
+lazily so the Postgres-only image needs no ODBC.
+
+NOTE: some dashboard *page* queries still use SQL-Server dialect (DATEADD, ISNULL,
+GETUTCDATE, TOP) — those must be rewritten for Postgres and verified on the VPS.
+See MIGRATION_NOTES.md. `date_sql` below is already dialect-aware.
 """
 from __future__ import annotations
 
@@ -11,7 +16,6 @@ import os
 from pathlib import Path
 
 import pandas as pd
-import pyodbc
 import streamlit as st
 
 try:
@@ -20,8 +24,11 @@ try:
 except ImportError:
     pass
 
+# "postgres" (default) | "sqlserver" (legacy fallback).
+DB_BACKEND = os.getenv("FUB_DB_BACKEND", "postgres").strip().lower()
 
-def _conn_str() -> str:
+
+def _sqlserver_conn_str() -> str:
     server = os.getenv("GHL_SQL_SERVER", "localhost,1433")
     user = os.getenv("GHL_SQL_USER", "sa")
     pw = os.getenv("GHL_SQL_PASSWORD", "")
@@ -33,9 +40,23 @@ def _conn_str() -> str:
     )
 
 
+def _pg_conninfo() -> str:
+    host = os.environ["PG_HOST"]
+    port = os.getenv("PG_PORT", "5432")
+    db = os.getenv("PG_DATABASE", "dcr_warehouse")
+    user = os.getenv("PG_RO_USER", "dcr_ro")
+    pw = os.environ["PG_RO_PASSWORD"]
+    ssl = os.getenv("PGSSLMODE", "require")
+    return f"host={host} port={port} dbname={db} user={user} password={pw} sslmode={ssl}"
+
+
 @st.cache_resource
-def get_connection() -> "pyodbc.Connection":
-    return pyodbc.connect(_conn_str(), autocommit=True)
+def get_connection():
+    if DB_BACKEND == "sqlserver":
+        import pyodbc
+        return pyodbc.connect(_sqlserver_conn_str(), autocommit=True)
+    import psycopg
+    return psycopg.connect(_pg_conninfo(), autocommit=True)
 
 
 @st.cache_data(ttl=300)
@@ -116,7 +137,14 @@ def date_sql(col: str, leading: str = "AND") -> str:
     cr = custom_range()
     if cr:
         s, e = cr
+        if DB_BACKEND == "sqlserver":
+            return (f" {leading} {col} >= '{s.isoformat()}'"
+                    f" AND {col} < DATEADD(DAY, 1, '{e.isoformat()}')")
         return (f" {leading} {col} >= '{s.isoformat()}'"
-                f" AND {col} < DATEADD(DAY, 1, '{e.isoformat()}')")
+                f" AND {col} < (DATE '{e.isoformat()}' + INTERVAL '1 day')")
     days = selected_days()
-    return f" {leading} {col} >= DATEADD(DAY, -{int(days)}, GETUTCDATE())" if days else ""
+    if not days:
+        return ""
+    if DB_BACKEND == "sqlserver":
+        return f" {leading} {col} >= DATEADD(DAY, -{int(days)}, GETUTCDATE())"
+    return f" {leading} {col} >= (now() AT TIME ZONE 'utc') - INTERVAL '{int(days)} days'"

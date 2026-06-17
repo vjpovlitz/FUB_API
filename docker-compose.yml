@@ -49,3 +49,21 @@ services:
     tty: true
     profiles:
       - mcp
+
+  # One-shot ETL: create fub.* + load the exported CSVs into the shared Postgres
+  # dcr_warehouse (owned by DCR/GHL_API's `db` service, or a managed Postgres).
+  # Set PG_* in .env to a reachable warehouse.
+  #   docker compose --profile etl run --rm etl
+  #   docker compose --profile etl run --rm etl python postgres/load_to_pg.py --only Deals
+  etl:
+    build: .
+    image: fub-warehouse:latest
+    container_name: fub-etl
+    command: ["python", "postgres/load_to_pg.py", "--init-schema"]
+    env_file:
+      - .env
+    volumes:
+      - ./data/exports:/app/data/exports:ro
+    restart: "no"
+    profiles:
+      - etl

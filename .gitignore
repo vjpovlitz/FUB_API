@@ -43,3 +43,7 @@ data/exports/
 
 # Docker / runtime
 .env.docker
+
+# large local DB backups — never commit
+SQLBackups.zip
+*.bak

@@ -4,7 +4,10 @@ The read-only `dcr_ro` login is the hard safety boundary; the validation here is
 defense-in-depth so the model gets a clear error instead of a SQL permission
 failure, and so obviously-destructive intent never reaches the server.
 
-This module is schema-agnostic — it is a verbatim port of GHL_API's dcr_mcp/db.py.
+This module is schema-agnostic. Primary backend is PostgreSQL (psycopg); the
+SQL Server path (pyodbc) is retained as a fallback, selected by FUB_DB_BACKEND
+(see config.py). Drivers are imported lazily so the Postgres-only image (no ODBC)
+never needs pyodbc, and vice-versa.
 """
 from __future__ import annotations
 
@@ -13,16 +16,27 @@ import re
 from decimal import Decimal
 from typing import Any
 
-import pyodbc
+from .config import (
+    DB_BACKEND,
+    MAX_ROWS_CEILING,
+    QUERY_TIMEOUT_SECONDS,
+    ro_conninfo,
+    ro_connection_string,
+)
 
-from .config import MAX_ROWS_CEILING, QUERY_TIMEOUT_SECONDS, ro_connection_string
-
-# Whole-word tokens that must never appear in a read query. `into` blocks
-# SELECT ... INTO (which writes a table); `waitfor` blocks WAITFOR DELAY (a DoS).
+# Whole-word tokens that must never appear in a read query — union of SQL-standard
+# writes/DDL + PostgreSQL-specific (copy/vacuum/do/call/pg_sleep/pg_read_file/…) +
+# SQL-Server-specific (waitfor/dbcc/openrowset/…) verbs, so the guardrail is safe
+# regardless of backend. `into` blocks SELECT ... INTO.
 _FORBIDDEN = re.compile(
     r"\b(insert|update|delete|merge|drop|alter|create|truncate|exec|execute|"
-    r"grant|revoke|deny|backup|restore|shutdown|reconfigure|into|openrowset|"
-    r"openquery|opendatasource|waitfor|dbcc|kill)\b",
+    r"grant|revoke|deny|into|"
+    r"copy|vacuum|analyze|reindex|cluster|refresh|do|call|"
+    r"pg_sleep|pg_read_file|pg_read_binary_file|pg_terminate_backend|"
+    r"pg_cancel_backend|lo_import|lo_export|set_config|dblink|"
+    r"pg_ls_dir|pg_stat_file|"
+    r"backup|restore|shutdown|reconfigure|openrowset|openquery|"
+    r"opendatasource|waitfor|dbcc|kill)\b",
     re.IGNORECASE,
 )
 _PROC = re.compile(r"\b(sp|xp)_\w+", re.IGNORECASE)
@@ -57,8 +71,13 @@ def run_readonly(
     when more rows were available.
     """
     cap = max(1, min(max_rows, MAX_ROWS_CEILING))
-    conn = pyodbc.connect(ro_connection_string(), autocommit=True)
-    conn.timeout = QUERY_TIMEOUT_SECONDS
+    if DB_BACKEND == "sqlserver":
+        import pyodbc  # lazy: only the legacy path needs the ODBC driver
+        conn = pyodbc.connect(ro_connection_string(), autocommit=True)
+        conn.timeout = QUERY_TIMEOUT_SECONDS
+    else:
+        import psycopg  # lazy: the Postgres-only image has no ODBC at all
+        conn = psycopg.connect(ro_conninfo(), autocommit=True)  # timeout via statement_timeout
     try:
         cur = conn.cursor()
         cur.execute(sql, params or [])
@@ -116,7 +135,7 @@ def run_select(sql: str, max_rows: int = 200) -> str:
         return f"Rejected: {e}"
     try:
         cols, rows, truncated = run_readonly(clean, max_rows=max_rows)
-    except pyodbc.Error as e:
+    except Exception as e:  # psycopg.Error or pyodbc.Error, depending on backend
         msg = str(e).split("]")[-1].strip()
         return f"SQL error: {msg}"
     return to_markdown(cols, rows, truncated, min(max_rows, MAX_ROWS_CEILING))

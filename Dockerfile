@@ -34,12 +34,15 @@ WORKDIR /app
 # install. src/ is needed because the install targets the local packages.
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
-RUN pip install ".[dashboard,mcp]"
+# [postgres] adds psycopg so the same image can run postgres/load_to_pg.py (the etl
+# service) — loads fub.* into the shared dcr_warehouse. dashboard/mcp still use pyodbc.
+RUN pip install ".[dashboard,mcp,postgres]"
 
 # --- app code ---------------------------------------------------------------
 COPY dashboard/ ./dashboard/
 COPY sql/ ./sql/
 COPY scripts/ ./scripts/
+COPY postgres/ ./postgres/
 COPY demo/ ./demo/
 COPY .streamlit/ ./.streamlit/
 
